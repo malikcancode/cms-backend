@@ -9,10 +9,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "https://construction-management-system-soft.vercel.app",
-    ], // Vite default port and production URL
+    origin: ["http://localhost:5173", "https://cms-frontend-bay.vercel.app"], // Vite default port and production URL
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
