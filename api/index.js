@@ -9,9 +9,14 @@ const app = express();
 // CORS Middleware - Must be first
 app.use(
   cors({
-    origin: ["http://localhost:5173", process.env.FRONTEND_URL].filter(Boolean),
+    origin: [
+      "http://localhost:5173",
+      "https://cms-frontend-bay.vercel.app",
+      process.env.FRONTEND_URL,
+    ].filter(Boolean),
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
     preflightContinue: false,
     optionsSuccessStatus: 204,
   })
