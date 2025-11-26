@@ -1,0 +1,60 @@
+const mongoose = require("mongoose");
+
+const customerSchema = new mongoose.Schema(
+  {
+    code: {
+      type: String,
+      required: [true, "Customer code is required"],
+      unique: true,
+      trim: true,
+      uppercase: true,
+    },
+    name: {
+      type: String,
+      required: [true, "Customer name is required"],
+      trim: true,
+    },
+    email: {
+      type: String,
+      required: [true, "Email is required"],
+      lowercase: true,
+      trim: true,
+      match: [
+        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+        "Please provide a valid email",
+      ],
+    },
+    phone: {
+      type: String,
+      required: [true, "Phone number is required"],
+      trim: true,
+    },
+    address: {
+      type: String,
+      required: [true, "Address is required"],
+      trim: true,
+    },
+    totalPurchase: {
+      type: Number,
+      default: 0,
+      min: [0, "Total purchase cannot be negative"],
+    },
+    balance: {
+      type: Number,
+      default: 0,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Index for better query performance
+customerSchema.index({ email: 1 });
+customerSchema.index({ name: 1 });
+
+module.exports = mongoose.model("Customer", customerSchema);
