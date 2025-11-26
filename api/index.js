@@ -25,30 +25,29 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Initialize database connection once
+let isDbInitialized = false;
+const initializeDB = async () => {
+  if (!isDbInitialized) {
+    try {
+      await connectDB();
+      isDbInitialized = true;
+      console.log("✓ Database initialized");
+    } catch (error) {
+      console.error("✗ Database initialization failed:", error.message);
+    }
+  }
+};
+
+// Initialize DB on startup
+initializeDB();
+
 // Log environment check
 console.log("Environment check:", {
   hasMongoUri: !!process.env.MONGO_URI,
   hasJwtSecret: !!process.env.JWT_SECRET,
   nodeEnv: process.env.NODE_ENV,
-});
-
-// Middleware to ensure DB connection before each request
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (error) {
-    console.error("Database connection error:", error.message);
-    res.status(503).json({
-      error: "Service temporarily unavailable",
-      message:
-        "Database connection failed. Please check MongoDB Atlas IP whitelist settings.",
-      debug: {
-        hasMongoUri: !!process.env.MONGO_URI,
-        error: error.message,
-      },
-    });
-  }
+  frontendUrl: process.env.FRONTEND_URL,
 });
 
 // Import Routes
@@ -107,7 +106,29 @@ app.get("/", (req, res) => {
 
 // Basic API route
 app.get("/api/test", (req, res) => {
-  res.status(200).json({ message: "API is working" });
+  res.status(200).json({
+    message: "API is working",
+    timestamp: new Date().toISOString(),
+    dbStatus: isDbInitialized ? "connected" : "initializing",
+  });
+});
+
+// Health check endpoint
+app.get("/api/health", async (req, res) => {
+  try {
+    await connectDB();
+    res.status(200).json({
+      status: "healthy",
+      database: "connected",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: "unhealthy",
+      database: "disconnected",
+      error: error.message,
+    });
+  }
 });
 
 // 404 handler for undefined routes
