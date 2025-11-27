@@ -8,7 +8,11 @@ const PORT = process.env.PORT || 5000;
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", process.env.FRONTEND_URL].filter(Boolean),
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      process.env.FRONTEND_URL,
+    ].filter(Boolean),
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -23,7 +27,14 @@ console.log("Environment check:", {
   hasJwtSecret: !!process.env.JWT_SECRET,
   nodeEnv: process.env.NODE_ENV,
   port: PORT,
+  frontendUrl: process.env.FRONTEND_URL,
 });
+
+console.log("CORS allowed origins:", [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  process.env.FRONTEND_URL,
+].filter(Boolean));
 
 // Apply database connection middleware to all routes
 app.use(ensureDbConnection);
