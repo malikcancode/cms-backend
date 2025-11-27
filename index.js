@@ -57,6 +57,21 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/account-types", accountTypeRoutes);
 app.use("/api/reports", reportRoutes);
 
+// Root route
+app.get("/", (req, res) => {
+  res.status(200).json({
+    message: "Construction Management System API",
+    status: "Server is running",
+    version: "1.0.0",
+    documentation: "Visit /api for available endpoints",
+    endpoints: {
+      api: "/api",
+      test: "/api/test",
+      health: "/api/health",
+    },
+  });
+});
+
 // API base route
 app.get("/api", (req, res) => {
   res.status(200).json({
