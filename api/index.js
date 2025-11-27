@@ -25,23 +25,6 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Initialize database connection once
-let isDbInitialized = false;
-const initializeDB = async () => {
-  if (!isDbInitialized) {
-    try {
-      await connectDB();
-      isDbInitialized = true;
-      console.log("✓ Database initialized");
-    } catch (error) {
-      console.error("✗ Database initialization failed:", error.message);
-    }
-  }
-};
-
-// Initialize DB on startup
-initializeDB();
-
 // Log environment check
 console.log("Environment check:", {
   hasMongoUri: !!process.env.MONGO_URI,
@@ -49,6 +32,22 @@ console.log("Environment check:", {
   nodeEnv: process.env.NODE_ENV,
   frontendUrl: process.env.FRONTEND_URL,
 });
+
+// Middleware to ensure DB connection for protected routes only
+const ensureDbConnection = async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("Database connection error:", error.message);
+    res.status(503).json({
+      success: false,
+      error: "Service temporarily unavailable",
+      message:
+        "Database connection failed. Please check MongoDB Atlas settings.",
+    });
+  }
+};
 
 // Import Routes
 const authRoutes = require("../routes/authRoutes");
@@ -65,20 +64,20 @@ const dashboardRoutes = require("../routes/dashboardRoutes");
 const accountTypeRoutes = require("../routes/accountTypeRoutes");
 const reportRoutes = require("../routes/reportRoutes");
 
-// Mount routes
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/projects", projectRoutes);
-app.use("/api/customers", customerRoutes);
-app.use("/api/chartofaccounts", chartOfAccountRoutes);
-app.use("/api/bankpayments", bankPaymentRoutes);
-app.use("/api/items", itemRoutes);
-app.use("/api/purchases", purchaseRoutes);
-app.use("/api/suppliers", supplierRoutes);
-app.use("/api/sales-invoices", salesInvoiceRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/account-types", accountTypeRoutes);
-app.use("/api/reports", reportRoutes);
+// Mount routes with DB connection middleware
+app.use("/api/auth", ensureDbConnection, authRoutes);
+app.use("/api/users", ensureDbConnection, userRoutes);
+app.use("/api/projects", ensureDbConnection, projectRoutes);
+app.use("/api/customers", ensureDbConnection, customerRoutes);
+app.use("/api/chartofaccounts", ensureDbConnection, chartOfAccountRoutes);
+app.use("/api/bankpayments", ensureDbConnection, bankPaymentRoutes);
+app.use("/api/items", ensureDbConnection, itemRoutes);
+app.use("/api/purchases", ensureDbConnection, purchaseRoutes);
+app.use("/api/suppliers", ensureDbConnection, supplierRoutes);
+app.use("/api/sales-invoices", ensureDbConnection, salesInvoiceRoutes);
+app.use("/api/dashboard", ensureDbConnection, dashboardRoutes);
+app.use("/api/account-types", ensureDbConnection, accountTypeRoutes);
+app.use("/api/reports", ensureDbConnection, reportRoutes);
 
 // Root route - must come after other routes
 app.get("/", (req, res) => {
@@ -104,12 +103,12 @@ app.get("/", (req, res) => {
   });
 });
 
-// Basic API route
+// Basic API route - no DB required
 app.get("/api/test", (req, res) => {
   res.status(200).json({
     message: "API is working",
     timestamp: new Date().toISOString(),
-    dbStatus: isDbInitialized ? "connected" : "initializing",
+    environment: process.env.NODE_ENV || "development",
   });
 });
 
