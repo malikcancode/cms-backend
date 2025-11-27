@@ -9,9 +9,16 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://cms-frontend-bay.vercel.app"], // Vite default port and production URL
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    origin: [
+      "http://localhost:5173",
+      "https://cms-frontend-bay.vercel.app",
+      "https://cms-backend-rouge.vercel.app",
+      process.env.FRONTEND_URL,
+      process.env.BACKEND_URL,
+    ].filter(Boolean),
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
   })
 );
 app.use(express.json());
@@ -49,11 +56,17 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/account-types", accountTypeRoutes);
 app.use("/api/reports", reportRoutes);
 
-// Root route
+// Root route - redirect to /api
 app.get("/", (req, res) => {
+  res.redirect(301, "/api");
+});
+
+// API base route - same as root
+app.get("/api", (req, res) => {
   res.status(200).json({
     message: "Construction Management System API",
     status: "Server is running",
+    version: "1.0.0",
     endpoints: {
       auth: "/api/auth",
       users: "/api/users",
@@ -68,20 +81,62 @@ app.get("/", (req, res) => {
       dashboard: "/api/dashboard",
       accountTypes: "/api/account-types",
       reports: "/api/reports",
-      test: "/api/test",
     },
   });
 });
 
-// Basic API route
+// Test endpoint
 app.get("/api/test", (req, res) => {
-  res.status(200).json({ message: "API is working" });
+  res.status(200).json({
+    message: "API is working",
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+  });
+});
+
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "healthy",
+    database: "connected",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// 404 handler for undefined routes
+app.use((req, res, next) => {
+  res.status(404).json({
+    error: "Not Found",
+    message: `Route ${req.method} ${req.url} not found`,
+    availableEndpoints: {
+      root: "/",
+      api: "/api",
+      test: "/api/test",
+      health: "/api/health",
+      auth: "/api/auth",
+      users: "/api/users",
+      projects: "/api/projects",
+      customers: "/api/customers",
+      chartofaccounts: "/api/chartofaccounts",
+      bankpayments: "/api/bankpayments",
+      items: "/api/items",
+      purchases: "/api/purchases",
+      suppliers: "/api/suppliers",
+      salesInvoices: "/api/sales-invoices",
+      dashboard: "/api/dashboard",
+      accountTypes: "/api/account-types",
+      reports: "/api/reports",
+    },
+  });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Error:", err.message);
-  res.status(500).json({ error: "Internal server error" });
+  res.status(500).json({
+    error: "Internal server error",
+    message: err.message,
+  });
 });
 
 // Start server

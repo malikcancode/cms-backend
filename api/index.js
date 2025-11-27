@@ -12,7 +12,9 @@ app.use(
     origin: [
       "http://localhost:5173",
       "https://cms-frontend-bay.vercel.app",
+      "https://cms-backend-rouge.vercel.app",
       process.env.FRONTEND_URL,
+      process.env.BACKEND_URL,
     ].filter(Boolean),
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -33,21 +35,10 @@ console.log("Environment check:", {
   frontendUrl: process.env.FRONTEND_URL,
 });
 
-// Middleware to ensure DB connection for protected routes only
-const ensureDbConnection = async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (error) {
-    console.error("Database connection error:", error.message);
-    res.status(503).json({
-      success: false,
-      error: "Service temporarily unavailable",
-      message:
-        "Database connection failed. Please check MongoDB Atlas settings.",
-    });
-  }
-};
+// Connect to DB once when the serverless function initializes
+connectDB().catch((error) => {
+  console.error("Initial DB connection failed:", error.message);
+});
 
 // Import Routes
 const authRoutes = require("../routes/authRoutes");
@@ -64,26 +55,27 @@ const dashboardRoutes = require("../routes/dashboardRoutes");
 const accountTypeRoutes = require("../routes/accountTypeRoutes");
 const reportRoutes = require("../routes/reportRoutes");
 
-// Mount routes with DB connection middleware
-app.use("/api/auth", ensureDbConnection, authRoutes);
-app.use("/api/users", ensureDbConnection, userRoutes);
-app.use("/api/projects", ensureDbConnection, projectRoutes);
-app.use("/api/customers", ensureDbConnection, customerRoutes);
-app.use("/api/chartofaccounts", ensureDbConnection, chartOfAccountRoutes);
-app.use("/api/bankpayments", ensureDbConnection, bankPaymentRoutes);
-app.use("/api/items", ensureDbConnection, itemRoutes);
-app.use("/api/purchases", ensureDbConnection, purchaseRoutes);
-app.use("/api/suppliers", ensureDbConnection, supplierRoutes);
-app.use("/api/sales-invoices", ensureDbConnection, salesInvoiceRoutes);
-app.use("/api/dashboard", ensureDbConnection, dashboardRoutes);
-app.use("/api/account-types", ensureDbConnection, accountTypeRoutes);
-app.use("/api/reports", ensureDbConnection, reportRoutes);
+// Mount routes - DB connection is handled globally
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/projects", projectRoutes);
+app.use("/api/customers", customerRoutes);
+app.use("/api/chartofaccounts", chartOfAccountRoutes);
+app.use("/api/bankpayments", bankPaymentRoutes);
+app.use("/api/items", itemRoutes);
+app.use("/api/purchases", purchaseRoutes);
+app.use("/api/suppliers", supplierRoutes);
+app.use("/api/sales-invoices", salesInvoiceRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/account-types", accountTypeRoutes);
+app.use("/api/reports", reportRoutes);
 
-// Root route - must come after other routes
-app.get("/", (req, res) => {
+// API base route
+app.get("/api", (req, res) => {
   res.status(200).json({
     message: "Construction Management System API",
     status: "Server is running",
+    version: "1.0.0",
     endpoints: {
       auth: "/api/auth",
       users: "/api/users",
@@ -98,9 +90,13 @@ app.get("/", (req, res) => {
       dashboard: "/api/dashboard",
       accountTypes: "/api/account-types",
       reports: "/api/reports",
-      test: "/api/test",
     },
   });
+});
+
+// Root route - redirect to /api
+app.get("/", (req, res) => {
+  res.redirect(301, "/api");
 });
 
 // Basic API route - no DB required
@@ -113,21 +109,15 @@ app.get("/api/test", (req, res) => {
 });
 
 // Health check endpoint
-app.get("/api/health", async (req, res) => {
-  try {
-    await connectDB();
-    res.status(200).json({
-      status: "healthy",
-      database: "connected",
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    res.status(503).json({
-      status: "unhealthy",
-      database: "disconnected",
-      error: error.message,
-    });
-  }
+app.get("/api/health", (req, res) => {
+  const mongoose = require("mongoose");
+  const isConnected = mongoose.connection.readyState === 1;
+
+  res.status(isConnected ? 200 : 503).json({
+    status: isConnected ? "healthy" : "unhealthy",
+    database: isConnected ? "connected" : "disconnected",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // 404 handler for undefined routes
