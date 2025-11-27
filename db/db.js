@@ -9,6 +9,22 @@ const connectDB = async () => {
     return mongoose.connection;
   }
 
+  // If connection is in progress, wait for it
+  if (mongoose.connection.readyState === 2) {
+    console.log("⏳ Connection already in progress, waiting...");
+    isConnected = false;
+    return new Promise((resolve, reject) => {
+      mongoose.connection.once("connected", () => {
+        isConnected = true;
+        resolve(mongoose.connection);
+      });
+      mongoose.connection.once("error", (err) => {
+        isConnected = false;
+        reject(err);
+      });
+    });
+  }
+
   try {
     const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
 
@@ -18,6 +34,7 @@ const connectDB = async () => {
 
     // Configure mongoose for serverless environment
     mongoose.set("strictQuery", false);
+    mongoose.set("bufferCommands", false); // Disable buffering for serverless
 
     const connection = await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 10000,

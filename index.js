@@ -1,12 +1,11 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const connectDB = require("./db/db");
+const ensureDbConnection = require("./middleware/dbConnection");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
 app.use(
   cors({
     origin: ["http://localhost:5173", process.env.FRONTEND_URL].filter(Boolean),
@@ -26,8 +25,8 @@ console.log("Environment check:", {
   port: PORT,
 });
 
-// Connect to MongoDB
-connectDB();
+// Apply database connection middleware to all routes
+app.use(ensureDbConnection);
 
 // Routes
 const authRoutes = require("./routes/authRoutes");
