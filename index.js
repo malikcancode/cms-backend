@@ -30,11 +30,14 @@ console.log("Environment check:", {
   frontendUrl: process.env.FRONTEND_URL,
 });
 
-console.log("CORS allowed origins:", [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  process.env.FRONTEND_URL,
-].filter(Boolean));
+console.log(
+  "CORS allowed origins:",
+  [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    process.env.FRONTEND_URL,
+  ].filter(Boolean)
+);
 
 // Apply database connection middleware to all routes
 app.use(ensureDbConnection);

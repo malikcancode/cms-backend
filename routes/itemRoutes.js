@@ -9,11 +9,16 @@ const {
   getItemByCode,
   getItemsByCategory,
   getItemsBySubCategory,
+  syncItemStock,
 } = require("../controllers/itemController");
 const { protect } = require("../middleware/authMiddleware");
 
 // All routes are protected
 router.use(protect);
+
+// @route   POST /api/items/sync-stock
+// @desc    Sync currentStock with quantity for items
+router.post("/sync-stock", syncItemStock);
 
 // @route   GET /api/items
 // @desc    Get all items

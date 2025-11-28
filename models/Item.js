@@ -65,18 +65,18 @@ const itemSchema = new mongoose.Schema(
       min: [0, "Sale tax rate cannot be negative"],
       max: [100, "Sale tax rate cannot exceed 100%"],
     },
-    valuationCost: {
-      type: Number,
-      default: 0,
-      min: [0, "Valuation cost cannot be negative"],
-    },
     sellingPrice: {
       type: Number,
       default: 0,
       min: [0, "Selling price cannot be negative"],
     },
 
-    // Stock Information (optional, for future use)
+    // Stock Information
+    quantity: {
+      type: Number,
+      default: 0,
+      min: [0, "Quantity cannot be negative"],
+    },
     currentStock: {
       type: Number,
       default: 0,
@@ -103,5 +103,15 @@ const itemSchema = new mongoose.Schema(
 itemSchema.index({ categoryCode: 1 });
 itemSchema.index({ subCategoryCode: 1 });
 itemSchema.index({ name: 1 });
+
+// Pre-save hook: Initialize currentStock with quantity (existing warehouse stock)
+// When user creates an item, quantity represents what they already have in warehouse
+// currentStock is then updated by purchases (adds stock) and sales (reduces stock)
+itemSchema.pre("save", async function () {
+  // Only for new items - set currentStock to quantity (existing warehouse stock)
+  if (this.isNew) {
+    this.currentStock = this.quantity;
+  }
+});
 
 module.exports = mongoose.model("Item", itemSchema);

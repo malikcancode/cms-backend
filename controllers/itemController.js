@@ -67,7 +67,7 @@ exports.createItem = async (req, res) => {
       measurement,
       purchasePrice,
       saleTaxRate,
-      valuationCost,
+      quantity,
       sellingPrice,
       currentStock,
       minStockLevel,
@@ -106,11 +106,15 @@ exports.createItem = async (req, res) => {
       measurement,
       purchasePrice: purchasePrice || 0,
       saleTaxRate: saleTaxRate || 0,
-      valuationCost: valuationCost || 0,
+      quantity: quantity || 0,
       sellingPrice: sellingPrice || 0,
-      currentStock: currentStock || 0,
       minStockLevel: minStockLevel || 0,
     };
+
+    // Only set currentStock if explicitly provided, otherwise let pre-save hook handle it
+    if (typeof currentStock === "number") {
+      itemData.currentStock = currentStock;
+    }
 
     // Create new item
     const item = await Item.create(itemData);
@@ -147,7 +151,7 @@ exports.updateItem = async (req, res) => {
       measurement,
       purchasePrice,
       saleTaxRate,
-      valuationCost,
+      quantity,
       sellingPrice,
       currentStock,
       minStockLevel,
@@ -194,7 +198,7 @@ exports.updateItem = async (req, res) => {
 
     if (typeof purchasePrice === "number") item.purchasePrice = purchasePrice;
     if (typeof saleTaxRate === "number") item.saleTaxRate = saleTaxRate;
-    if (typeof valuationCost === "number") item.valuationCost = valuationCost;
+    if (typeof quantity === "number") item.quantity = quantity;
     if (typeof sellingPrice === "number") item.sellingPrice = sellingPrice;
     if (typeof currentStock === "number") item.currentStock = currentStock;
     if (typeof minStockLevel === "number") item.minStockLevel = minStockLevel;
@@ -342,6 +346,44 @@ exports.getItemsBySubCategory = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching items",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Sync currentStock with quantity for items where currentStock is 0
+// @route   POST /api/items/sync-stock
+// @access  Private (Admin only)
+exports.syncItemStock = async (req, res) => {
+  try {
+    // Find all items where currentStock is 0 but quantity > 0
+    const result = await Item.updateMany(
+      {
+        currentStock: 0,
+        quantity: { $gt: 0 },
+      },
+      [
+        {
+          $set: {
+            currentStock: "$quantity",
+          },
+        },
+      ]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Stock synchronized successfully",
+      data: {
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount,
+      },
+    });
+  } catch (error) {
+    console.error("Sync item stock error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error synchronizing stock",
       error: error.message,
     });
   }
