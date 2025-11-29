@@ -25,6 +25,8 @@ const accountTypeSchema = new mongoose.Schema(
         "Assets",
         "Liabilities",
         "Equity",
+        "EXPENSE ACCOUNTS",
+        "REVENUE ACCOUNTS",
       ],
     },
     description: {

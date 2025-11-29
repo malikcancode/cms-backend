@@ -152,6 +152,12 @@ exports.createCashPayment = async (req, res) => {
       success: false,
       message: "Error creating cash payment",
       error: error.message,
+      details: error.errors
+        ? Object.keys(error.errors).map((key) => ({
+            field: key,
+            message: error.errors[key].message,
+          }))
+        : undefined,
     });
   }
 };

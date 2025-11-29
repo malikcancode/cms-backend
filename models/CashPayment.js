@@ -26,7 +26,6 @@ const CashPaymentSchema = new mongoose.Schema(
   {
     serialNo: {
       type: String,
-      required: true,
       unique: true,
       trim: true,
     },
@@ -76,15 +75,24 @@ CashPaymentSchema.index({ date: -1 });
 CashPaymentSchema.index({ project: 1 });
 CashPaymentSchema.index({ serialNo: 1 });
 
-// Generate serial number before saving and track if document is new
-CashPaymentSchema.pre("save", async function () {
-  // Track if document is new (for post-save hook)
-  this.wasNew = this.isNew;
-
-  if (!this.serialNo || this.serialNo === "") {
-    const count = await mongoose.model("CashPayment").countDocuments();
-    this.serialNo = `CP${String(count + 1).padStart(6, "0")}`;
+// Generate serial number before validation
+CashPaymentSchema.pre("validate", async function () {
+  // Only generate for new documents without a serial number
+  if (this.isNew && !this.serialNo) {
+    try {
+      const count = await mongoose.model("CashPayment").countDocuments();
+      this.serialNo = `CP${String(count + 1).padStart(6, "0")}`;
+      console.log("Generated serial number:", this.serialNo);
+    } catch (error) {
+      console.error("Error generating serial number:", error);
+      throw error;
+    }
   }
+});
+
+// Track if document is new for post-save hook
+CashPaymentSchema.pre("save", function () {
+  this.wasNew = this.isNew;
 });
 
 // Post-save middleware to create journal entry for accounting
