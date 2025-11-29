@@ -52,6 +52,24 @@ const supplierSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
+    paymentTerms: {
+      type: String,
+      trim: true,
+      default: "30 days credit",
+    },
+    taxId: {
+      type: String,
+      trim: true,
+    },
+    totalPurchases: {
+      type: Number,
+      default: 0,
+      min: [0, "Total purchases cannot be negative"],
+    },
+    balance: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
@@ -61,5 +79,6 @@ const supplierSchema = new mongoose.Schema(
 // Index for faster queries
 supplierSchema.index({ name: 1 });
 supplierSchema.index({ category: 1 });
+supplierSchema.index({ code: 1 });
 
 module.exports = mongoose.model("Supplier", supplierSchema);

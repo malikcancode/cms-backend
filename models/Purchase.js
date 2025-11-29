@@ -127,6 +127,12 @@ const purchaseSchema = new mongoose.Schema(
       default: true,
     },
 
+    // Audit field
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
     // Payment Tracking
     amountPaid: {
       type: Number,
@@ -171,8 +177,11 @@ purchaseSchema.index({ item: 1, date: -1 });
 purchaseSchema.index({ project: 1, date: -1 });
 purchaseSchema.index({ paymentStatus: 1 });
 
-// Pre-save middleware to calculate amounts and payment status
+// Pre-save middleware to calculate amounts, payment status, and track if document is new
 purchaseSchema.pre("save", async function () {
+  // Track if document is new (for post-save hook)
+  this.wasNew = this.isNew;
+
   // Calculate gross amount if not provided
   if (!this.grossAmount || this.grossAmount === 0) {
     this.grossAmount = this.quantity * this.rate;
@@ -188,6 +197,48 @@ purchaseSchema.pre("save", async function () {
     this.paymentStatus = "paid";
   } else {
     this.paymentStatus = "partial";
+  }
+});
+
+// Post-save middleware to create journal entry for accounting
+purchaseSchema.post("save", async function (doc) {
+  // Only create journal entry if this is a new purchase (not an update)
+  if (this.wasNew && doc.status !== "cancelled") {
+    try {
+      const AccountingService = require("../services/accountingService");
+
+      // Get the user who created the purchase (default to first admin if not available)
+      let userId = doc.createdBy;
+      if (!userId) {
+        const User = require("./User");
+        const admin = await User.findOne({ role: "admin" });
+        userId = admin ? admin._id : null;
+      }
+
+      if (userId) {
+        console.log(
+          "Creating journal entry for purchase:",
+          doc.purchaseOrderNo
+        );
+        const journalEntry = await AccountingService.createPurchaseJournalEntry(
+          doc,
+          userId
+        );
+        console.log(
+          "✓ Journal entry created successfully:",
+          journalEntry.entryNumber
+        );
+      } else {
+        console.error("❌ No user ID found for journal entry creation");
+      }
+    } catch (error) {
+      console.error(
+        "❌ Error creating journal entry for purchase:",
+        error.message
+      );
+      console.error("Error stack:", error.stack);
+      // Don't throw error to prevent purchase creation failure
+    }
   }
 });
 

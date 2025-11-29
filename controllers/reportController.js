@@ -371,8 +371,343 @@ const getSupplierLedger = async (req, res) => {
   }
 };
 
+// @desc    Get Project Ledger Report
+// @route   GET /api/reports/project-ledger/:projectId
+// @access  Private
+const getProjectLedger = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    const AccountingService = require("../services/accountingService");
+    const Project = require("../models/Project");
+
+    // Verify project exists
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    const ledger = await AccountingService.getProjectLedger(
+      projectId,
+      startDate,
+      endDate
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        project: {
+          id: project._id,
+          name: project.name,
+          code: project.code,
+          client: project.client,
+          estimatedCost: project.estimatedCost,
+          status: project.status,
+        },
+        ...ledger,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching project ledger:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching project ledger",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get Customer Ledger Report
+// @route   GET /api/reports/customer-ledger/:customerId
+// @access  Private
+const getCustomerLedger = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    const AccountingService = require("../services/accountingService");
+
+    const ledger = await AccountingService.getCustomerLedger(
+      customerId,
+      startDate,
+      endDate
+    );
+
+    res.status(200).json({
+      success: true,
+      data: ledger,
+    });
+  } catch (error) {
+    console.error("Error fetching customer ledger:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching customer ledger",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get Supplier Ledger Report (New Version using AccountingService)
+// @route   GET /api/reports/supplier-ledger-v2/:supplierCode
+// @access  Private
+const getSupplierLedgerV2 = async (req, res) => {
+  try {
+    const { supplierCode } = req.params;
+    const { startDate, endDate } = req.query;
+
+    const AccountingService = require("../services/accountingService");
+
+    const ledger = await AccountingService.getSupplierLedger(
+      supplierCode,
+      startDate,
+      endDate
+    );
+
+    res.status(200).json({
+      success: true,
+      data: ledger,
+    });
+  } catch (error) {
+    console.error("Error fetching supplier ledger:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching supplier ledger",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get Inventory Report (New Version using AccountingService)
+// @route   GET /api/reports/inventory-v2
+// @access  Private
+const getInventoryReportV2 = async (req, res) => {
+  try {
+    const AccountingService = require("../services/accountingService");
+
+    const report = await AccountingService.getInventoryReport();
+
+    res.status(200).json({
+      success: true,
+      data: report,
+    });
+  } catch (error) {
+    console.error("Error fetching inventory report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching inventory report",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Record customer payment receipt
+// @route   POST /api/reports/payment-receipt
+// @access  Private
+const recordPaymentReceipt = async (req, res) => {
+  try {
+    const {
+      customerId,
+      customerName,
+      amount,
+      paymentMethod,
+      bankName,
+      invoiceRef,
+      date,
+      reference,
+      description,
+    } = req.body;
+
+    // Validation
+    if (!customerId || !customerName || !amount || !paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide customer, amount, and payment method",
+      });
+    }
+
+    const AccountingService = require("../services/accountingService");
+    const Customer = require("../models/Customer");
+    const SalesInvoice = require("../models/SalesInvoice");
+
+    // Verify customer exists
+    const customer = await Customer.findById(customerId);
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found",
+      });
+    }
+
+    // If invoice reference provided, update the invoice
+    if (invoiceRef) {
+      const invoice = await SalesInvoice.findOne({ serialNo: invoiceRef });
+      if (invoice) {
+        invoice.amountReceived += amount;
+        invoice.balance = invoice.netTotal - invoice.amountReceived;
+
+        // Update status
+        if (invoice.amountReceived >= invoice.netTotal) {
+          invoice.status = "paid";
+          invoice.balance = 0;
+        } else if (invoice.amountReceived > 0) {
+          invoice.status = "partial";
+        }
+
+        await invoice.save();
+      }
+    }
+
+    // Update customer balance
+    await Customer.findByIdAndUpdate(customerId, {
+      $inc: { balance: -amount },
+    });
+
+    // Create journal entry
+    const payment = {
+      customerName,
+      amount,
+      paymentMethod,
+      bankName,
+      invoiceRef,
+      date: date || new Date(),
+      reference: reference || `PR-${Date.now()}`,
+      description: description || `Payment received from ${customerName}`,
+    };
+
+    const journalEntry = await AccountingService.createPaymentReceiptEntry(
+      payment,
+      req.user._id
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Payment receipt recorded successfully",
+      data: {
+        journalEntry: journalEntry.entryNumber,
+        amount: amount,
+        customer: customerName,
+      },
+    });
+  } catch (error) {
+    console.error("Error recording payment receipt:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error recording payment receipt",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Record supplier payment
+// @route   POST /api/reports/supplier-payment
+// @access  Private
+const recordSupplierPayment = async (req, res) => {
+  try {
+    const {
+      supplierCode,
+      supplierName,
+      amount,
+      paymentMethod,
+      bankName,
+      purchaseRef,
+      date,
+      reference,
+      description,
+    } = req.body;
+
+    // Validation
+    if (!supplierCode || !supplierName || !amount || !paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide supplier, amount, and payment method",
+      });
+    }
+
+    const AccountingService = require("../services/accountingService");
+    const Supplier = require("../models/Supplier");
+    const Purchase = require("../models/Purchase");
+
+    // Verify supplier exists
+    const supplier = await Supplier.findOne({ code: supplierCode });
+    if (!supplier) {
+      return res.status(404).json({
+        success: false,
+        message: "Supplier not found",
+      });
+    }
+
+    // If purchase reference provided, update the purchase
+    if (purchaseRef) {
+      const purchase = await Purchase.findOne({ purchaseOrderNo: purchaseRef });
+      if (purchase) {
+        purchase.amountPaid = (purchase.amountPaid || 0) + amount;
+
+        // Update payment status
+        if (purchase.amountPaid >= purchase.netAmount) {
+          purchase.paymentStatus = "paid";
+        } else if (purchase.amountPaid > 0) {
+          purchase.paymentStatus = "partial";
+        }
+
+        // Add to payments array
+        purchase.payments.push({
+          amount: amount,
+          date: date || new Date(),
+          description: description || `Payment to ${supplierName}`,
+        });
+
+        await purchase.save();
+      }
+    }
+
+    // Create journal entry
+    const payment = {
+      supplierName,
+      amount,
+      paymentMethod,
+      bankName,
+      purchaseRef,
+      date: date || new Date(),
+      reference: reference || `SP-${Date.now()}`,
+      description: description || `Payment to ${supplierName}`,
+    };
+
+    const journalEntry = await AccountingService.createSupplierPaymentEntry(
+      payment,
+      req.user._id
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Supplier payment recorded successfully",
+      data: {
+        journalEntry: journalEntry.entryNumber,
+        amount: amount,
+        supplier: supplierName,
+      },
+    });
+  } catch (error) {
+    console.error("Error recording supplier payment:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error recording supplier payment",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getIncomeStatement,
   getInventoryReport,
   getSupplierLedger,
+  getProjectLedger,
+  getCustomerLedger,
+  getSupplierLedgerV2,
+  getInventoryReportV2,
+  recordPaymentReceipt,
+  recordSupplierPayment,
 };

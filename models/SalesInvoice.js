@@ -200,8 +200,11 @@ salesInvoiceSchema.index({ customer: 1, date: -1 });
 salesInvoiceSchema.index({ project: 1, date: -1 });
 salesInvoiceSchema.index({ "items.itemCode": 1 });
 
-// Pre-save middleware to calculate amounts and generate serial number
-salesInvoiceSchema.pre("save", async function () {
+// Pre-save middleware to calculate amounts, generate serial number, and track if document is new
+salesInvoiceSchema.pre("save", async function (next) {
+  // Track if document is new (for post-save hook)
+  this.wasNew = this.isNew;
+
   // Generate random serial number if not provided
   if (!this.serialNo) {
     let isUnique = false;
@@ -256,6 +259,34 @@ salesInvoiceSchema.pre("save", async function () {
     this.balance = 0;
   } else {
     this.status = "partial";
+  }
+});
+
+// Post-save middleware to create journal entry for accounting
+salesInvoiceSchema.post("save", async function (doc) {
+  // Only create journal entry if this is a new invoice (not an update)
+  if (this.wasNew && doc.status !== "cancelled") {
+    try {
+      const AccountingService = require("../services/accountingService");
+
+      // Get the user who created the invoice (default to first admin if not available)
+      let userId = doc.createdBy;
+      if (!userId) {
+        const User = require("./User");
+        const admin = await User.findOne({ role: "admin" });
+        userId = admin ? admin._id : null;
+      }
+
+      if (userId) {
+        await AccountingService.createSalesJournalEntry(doc, userId);
+      }
+    } catch (error) {
+      console.error(
+        "Error creating journal entry for sales invoice:",
+        error.message
+      );
+      // Don't throw error to prevent invoice creation failure
+    }
   }
 });
 

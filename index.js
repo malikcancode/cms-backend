@@ -56,6 +56,9 @@ const salesInvoiceRoutes = require("./routes/salesInvoiceRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const accountTypeRoutes = require("./routes/accountTypeRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const journalEntryRoutes = require("./routes/journalEntryRoutes");
+const generalLedgerRoutes = require("./routes/generalLedgerRoutes");
+const cashPaymentRoutes = require("./routes/cashPaymentRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -63,6 +66,7 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/chartofaccounts", chartOfAccountRoutes);
 app.use("/api/bankpayments", bankPaymentRoutes);
+app.use("/api/cashpayments", cashPaymentRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/purchases", purchaseRoutes);
 app.use("/api/suppliers", supplierRoutes);
@@ -70,6 +74,8 @@ app.use("/api/sales-invoices", salesInvoiceRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/account-types", accountTypeRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/journal-entries", journalEntryRoutes);
+app.use("/api/general-ledger", generalLedgerRoutes);
 
 // Root route
 app.get("/", (req, res) => {
@@ -99,6 +105,7 @@ app.get("/api", (req, res) => {
       customers: "/api/customers",
       chartofaccounts: "/api/chartofaccounts",
       bankpayments: "/api/bankpayments",
+      cashpayments: "/api/cashpayments",
       items: "/api/items",
       purchases: "/api/purchases",
       suppliers: "/api/suppliers",
@@ -106,6 +113,8 @@ app.get("/api", (req, res) => {
       dashboard: "/api/dashboard",
       accountTypes: "/api/account-types",
       reports: "/api/reports",
+      journalEntries: "/api/journal-entries",
+      generalLedger: "/api/general-ledger",
     },
   });
 });
@@ -146,6 +155,7 @@ app.use((req, res, next) => {
       customers: "/api/customers",
       chartofaccounts: "/api/chartofaccounts",
       bankpayments: "/api/bankpayments",
+      cashpayments: "/api/cashpayments",
       items: "/api/items",
       purchases: "/api/purchases",
       suppliers: "/api/suppliers",
@@ -153,6 +163,8 @@ app.use((req, res, next) => {
       dashboard: "/api/dashboard",
       accountTypes: "/api/account-types",
       reports: "/api/reports",
+      journalEntries: "/api/journal-entries",
+      generalLedger: "/api/general-ledger",
     },
   });
 });

@@ -43,6 +43,24 @@ const customerSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    creditLimit: {
+      type: Number,
+      default: 0,
+      min: [0, "Credit limit cannot be negative"],
+    },
+    paymentTerms: {
+      type: String,
+      trim: true,
+      default: "Cash",
+    },
+    taxId: {
+      type: String,
+      trim: true,
+    },
+    businessType: {
+      type: String,
+      trim: true,
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -56,5 +74,6 @@ const customerSchema = new mongoose.Schema(
 // Index for better query performance
 customerSchema.index({ email: 1 });
 customerSchema.index({ name: 1 });
+customerSchema.index({ code: 1 });
 
 module.exports = mongoose.model("Customer", customerSchema);

@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const PaymentLineSchema = new mongoose.Schema({
+const CashPaymentLineSchema = new mongoose.Schema({
   accountCode: {
     type: String,
     required: true,
@@ -22,7 +22,7 @@ const PaymentLineSchema = new mongoose.Schema({
   },
 });
 
-const BankPaymentSchema = new mongoose.Schema(
+const CashPaymentSchema = new mongoose.Schema(
   {
     serialNo: {
       type: String,
@@ -50,36 +50,15 @@ const BankPaymentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-    bankAccount: {
-      type: String,
-      required: true,
-      enum: [
-        "Meezan Bank",
-        "HBL",
-        "Allied Bank",
-        "UBL",
-        "MCB",
-        "Standard Chartered",
-        "Faysal Bank",
-        "Bank Alfalah",
-      ],
-    },
-    bankAccountNumber: {
-      type: String,
-      trim: true,
-    },
-    chequeNo: {
-      type: String,
-      trim: true,
-    },
-    chequeDate: {
-      type: Date,
-    },
-    paymentLines: [PaymentLineSchema],
+    paymentLines: [CashPaymentLineSchema],
     totalAmount: {
       type: Number,
       required: true,
       min: 0,
+    },
+    remarks: {
+      type: String,
+      trim: true,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -93,23 +72,23 @@ const BankPaymentSchema = new mongoose.Schema(
 );
 
 // Index for faster queries
-BankPaymentSchema.index({ date: -1 });
-BankPaymentSchema.index({ project: 1 });
-BankPaymentSchema.index({ bankAccount: 1 });
+CashPaymentSchema.index({ date: -1 });
+CashPaymentSchema.index({ project: 1 });
+CashPaymentSchema.index({ serialNo: 1 });
 
 // Generate serial number before saving and track if document is new
-BankPaymentSchema.pre("save", async function () {
+CashPaymentSchema.pre("save", async function () {
   // Track if document is new (for post-save hook)
   this.wasNew = this.isNew;
 
   if (!this.serialNo || this.serialNo === "") {
-    const count = await mongoose.model("BankPayment").countDocuments();
-    this.serialNo = `BP${String(count + 1).padStart(6, "0")}`;
+    const count = await mongoose.model("CashPayment").countDocuments();
+    this.serialNo = `CP${String(count + 1).padStart(6, "0")}`;
   }
 });
 
 // Post-save middleware to create journal entry for accounting
-BankPaymentSchema.post("save", async function (doc) {
+CashPaymentSchema.post("save", async function (doc) {
   // Only create journal entry if this is a new payment (not an update)
   if (this.wasNew && !doc.cancel) {
     try {
@@ -119,11 +98,11 @@ BankPaymentSchema.post("save", async function (doc) {
       const userId = doc.createdBy;
 
       if (userId) {
-        await AccountingService.createBankPaymentJournalEntry(doc, userId);
+        await AccountingService.createCashPaymentJournalEntry(doc, userId);
       }
     } catch (error) {
       console.error(
-        "Error creating journal entry for bank payment:",
+        "Error creating journal entry for cash payment:",
         error.message
       );
       // Don't throw error to prevent payment creation failure
@@ -131,6 +110,6 @@ BankPaymentSchema.post("save", async function (doc) {
   }
 });
 
-const BankPayment = mongoose.model("BankPayment", BankPaymentSchema);
+const CashPayment = mongoose.model("CashPayment", CashPaymentSchema);
 
-module.exports = BankPayment;
+module.exports = CashPayment;

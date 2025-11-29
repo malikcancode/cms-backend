@@ -151,6 +151,7 @@ exports.createPurchase = async (req, res) => {
       discount: discount || 0,
       netAmount: netAmount || quantity * rate - (discount || 0),
       project: project || null,
+      createdBy: req.user ? req.user._id : null,
     };
 
     // Create new purchase
@@ -160,6 +161,20 @@ exports.createPurchase = async (req, res) => {
     await Item.findByIdAndUpdate(item, {
       $inc: { currentStock: quantity },
     });
+
+    // Update supplier balance (add to payables)
+    if (vendorCode) {
+      const Supplier = require("../models/Supplier");
+      await Supplier.findOneAndUpdate(
+        { code: vendorCode },
+        {
+          $inc: {
+            totalPurchases: purchaseData.netAmount,
+            balance: purchaseData.netAmount,
+          },
+        }
+      );
+    }
 
     // Populate references before sending response
     await purchase.populate("item", "name itemCode measurement");

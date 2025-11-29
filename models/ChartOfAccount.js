@@ -28,25 +28,47 @@ const ListAccountSchema = new mongoose.Schema({
 
 const ChartOfAccountSchema = new mongoose.Schema(
   {
+    code: {
+      type: String,
+      trim: true,
+      sparse: true,
+      index: true,
+    },
+    name: {
+      type: String,
+      trim: true,
+    },
+    accountType: {
+      type: String,
+      enum: ["Asset", "Liability", "Equity", "Revenue", "Expense"],
+    },
     mainAccountType: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "AccountType",
-      required: true,
     },
     mainTypeCode: {
       type: String,
-      required: true,
       trim: true,
     },
     mainAccountTypeText: {
       type: String,
-      required: true,
       trim: true,
     },
     financialComponent: {
       type: String,
-      required: true,
       trim: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    parentAccount: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ChartOfAccount",
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
     },
     subAccounts: [SubAccountSchema],
     listAccounts: [ListAccountSchema],

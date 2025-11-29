@@ -40,17 +40,71 @@ const getDashboardStats = async (req, res) => {
       status: "Active",
     });
 
-    // Get all projects for percentage calculations
-    const allProjects = await Project.find();
-    const completedProjects = await Project.countDocuments({
-      status: "Completed",
+    // Calculate month-over-month changes
+    const now = new Date();
+    const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstDayLastMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() - 1,
+      1
+    );
+    const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    // Last month's sales
+    const lastMonthSales = await SalesInvoice.find({
+      date: { $gte: firstDayLastMonth, $lte: lastDayLastMonth },
+    });
+    const lastMonthSalesTotal = lastMonthSales.reduce(
+      (sum, invoice) => sum + (invoice.netTotal || 0),
+      0
+    );
+
+    // Last month's purchases
+    const lastMonthPurchases = await Purchase.find({
+      date: { $gte: firstDayLastMonth, $lte: lastDayLastMonth },
+    });
+    const lastMonthPurchaseExpenses = lastMonthPurchases.reduce(
+      (sum, purchase) => sum + (purchase.netAmount || 0),
+      0
+    );
+
+    // Last month's bank payments
+    const lastMonthBankPayments = await BankPayment.find({
+      cancel: false,
+      date: { $gte: firstDayLastMonth, $lte: lastDayLastMonth },
+    });
+    const lastMonthBankPaymentExpenses = lastMonthBankPayments.reduce(
+      (sum, payment) => sum + (payment.totalAmount || 0),
+      0
+    );
+
+    const lastMonthExpenses =
+      lastMonthPurchaseExpenses + lastMonthBankPaymentExpenses;
+    const lastMonthProfit = lastMonthSalesTotal - lastMonthExpenses;
+
+    // Calculate percentage changes
+    const calculateChange = (current, previous) => {
+      if (previous === 0) {
+        return current > 0 ? "+100%" : "0%";
+      }
+      const change = ((current - previous) / previous) * 100;
+      const sign = change >= 0 ? "+" : "";
+      return `${sign}${change.toFixed(1)}%`;
+    };
+
+    const expensesChange = calculateChange(totalExpenses, lastMonthExpenses);
+    const salesChange = calculateChange(totalSales, lastMonthSalesTotal);
+    const profitChange = calculateChange(netProfit, lastMonthProfit);
+
+    // Get last month's active projects count
+    const lastMonthActiveProjects = await Project.countDocuments({
+      status: "Active",
+      createdAt: { $lt: firstDayThisMonth },
     });
 
-    // Calculate changes (mock data for now - you can implement month-over-month comparison)
-    const expensesChange = "+5.2%";
-    const salesChange = "+12.5%";
-    const profitChange = "+8.3%";
-    const projectsChange = `+${activeProjectsCount}`;
+    const projectsDiff = activeProjectsCount - lastMonthActiveProjects;
+    const projectsChange =
+      projectsDiff >= 0 ? `+${projectsDiff}` : `${projectsDiff}`;
 
     res.status(200).json({
       success: true,
