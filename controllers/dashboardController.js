@@ -15,12 +15,22 @@ const getDashboardStats = async (req, res) => {
       0
     );
 
-    // Get all purchases
+    // Get all purchases and bank payments for total expenses
     const purchases = await Purchase.find();
-    const totalExpenses = purchases.reduce(
+    const purchaseExpenses = purchases.reduce(
       (sum, purchase) => sum + (purchase.netAmount || 0),
       0
     );
+
+    // Get all bank payments (not cancelled)
+    const bankPayments = await BankPayment.find({ cancel: false });
+    const bankPaymentExpenses = bankPayments.reduce(
+      (sum, payment) => sum + (payment.totalAmount || 0),
+      0
+    );
+
+    // Total expenses = purchases + bank payments
+    const totalExpenses = purchaseExpenses + bankPaymentExpenses;
 
     // Calculate net profit
     const netProfit = totalSales - totalExpenses;
@@ -80,21 +90,47 @@ const getRecentProjects = async (req, res) => {
       .limit(limit)
       .populate("createdBy", "name");
 
-    // Get sales invoices for each project to calculate spent amount
+    // Calculate spent amount for each project from purchases and bank payments
     const projectsWithDetails = await Promise.all(
       projects.map(async (project) => {
-        // Get all sales invoices for this project
+        // Get all purchases for this project
+        const projectPurchases = await Purchase.find({
+          project: project._id,
+        });
+
+        // Calculate total from purchases
+        const purchaseSpent = projectPurchases.reduce(
+          (sum, purchase) => sum + (purchase.netAmount || 0),
+          0
+        );
+
+        // Get all bank payments for this project (not cancelled)
+        const projectBankPayments = await BankPayment.find({
+          project: project._id,
+          cancel: false,
+        });
+
+        // Calculate total from bank payments
+        const bankPaymentSpent = projectBankPayments.reduce(
+          (sum, payment) => sum + (payment.totalAmount || 0),
+          0
+        );
+
+        // Get all sales invoices for this project (revenue)
         const projectInvoices = await SalesInvoice.find({
           project: project._id,
         });
 
-        // Calculate total spent (sum of all invoice net totals)
-        const spent = projectInvoices.reduce(
+        // Calculate total revenue
+        const revenue = projectInvoices.reduce(
           (sum, invoice) => sum + (invoice.netTotal || 0),
           0
         );
 
-        // Calculate progress percentage
+        // Total spent = purchases + bank payments
+        const spent = purchaseSpent + bankPaymentSpent;
+
+        // Calculate progress percentage based on budget
         const budget = project.valueOfJob || project.estimatedCost || 0;
         const progress = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
 
@@ -105,6 +141,7 @@ const getRecentProjects = async (req, res) => {
           progress: Math.round(progress),
           budget: budget,
           spent: spent,
+          revenue: revenue,
           client: project.client,
           jobIncharge: project.jobIncharge,
           startDate: project.startDate,
