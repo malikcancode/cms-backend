@@ -320,6 +320,7 @@ exports.getProjectLedger = async (req, res) => {
   try {
     const Purchase = require("../models/Purchase");
     const BankPayment = require("../models/BankPayment");
+    const CashPayment = require("../models/CashPayment");
     const SalesInvoice = require("../models/SalesInvoice");
 
     const project = await Project.findById(req.params.id).populate(
@@ -348,6 +349,14 @@ exports.getProjectLedger = async (req, res) => {
       .populate("createdBy", "name email")
       .sort({ date: 1 });
 
+    // Get all cash payments for this project
+    const cashPayments = await CashPayment.find({
+      project: req.params.id,
+    })
+      .populate("employeeRef", "name email")
+      .populate("createdBy", "name email")
+      .sort({ date: 1 });
+
     // Get all sales invoices for this project
     const salesInvoices = await SalesInvoice.find({
       project: req.params.id,
@@ -362,6 +371,10 @@ exports.getProjectLedger = async (req, res) => {
       (sum, b) => sum + b.totalAmount,
       0
     );
+    const totalCashPayments = cashPayments.reduce(
+      (sum, c) => sum + c.totalAmount,
+      0
+    );
     const totalSalesInvoices = salesInvoices.reduce(
       (sum, si) => sum + si.netTotal,
       0
@@ -374,7 +387,8 @@ exports.getProjectLedger = async (req, res) => {
       (sum, si) => sum + si.balance,
       0
     );
-    const totalExpenses = totalPurchases + totalBankPayments;
+    const totalExpenses =
+      totalPurchases + totalBankPayments + totalCashPayments;
 
     // Calculate profit/loss - actual revenue from sales invoices
     const actualRevenue = totalSalesInvoices;
@@ -409,7 +423,31 @@ exports.getProjectLedger = async (req, res) => {
             accountName: line.accountName,
             totalAmount: 0,
             count: 0,
+            type: "Bank",
           };
+        }
+        paymentsByAccount[accountName].totalAmount += line.amount;
+        paymentsByAccount[accountName].count += 1;
+      });
+    });
+
+    // Group cash payments by account type for better insights
+    cashPayments.forEach((payment) => {
+      payment.paymentLines.forEach((line) => {
+        const accountName = line.accountName;
+        if (!paymentsByAccount[accountName]) {
+          paymentsByAccount[accountName] = {
+            accountCode: line.accountCode,
+            accountName: line.accountName,
+            totalAmount: 0,
+            count: 0,
+            type: "Cash",
+          };
+        } else {
+          // If account exists from bank payments, mark as "Both"
+          if (paymentsByAccount[accountName].type === "Bank") {
+            paymentsByAccount[accountName].type = "Both";
+          }
         }
         paymentsByAccount[accountName].totalAmount += line.amount;
         paymentsByAccount[accountName].count += 1;
@@ -436,6 +474,7 @@ exports.getProjectLedger = async (req, res) => {
           estimatedRevenue: project.valueOfJob || 0,
           totalPurchases,
           totalBankPayments,
+          totalCashPayments,
           totalExpenses,
           totalSalesInvoices,
           totalSalesReceived,
@@ -447,6 +486,7 @@ exports.getProjectLedger = async (req, res) => {
         },
         purchases,
         bankPayments,
+        cashPayments,
         salesInvoices,
         purchasesByVendor: Object.values(purchasesByVendor),
         paymentsByAccount: Object.values(paymentsByAccount),

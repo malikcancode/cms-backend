@@ -11,6 +11,7 @@ const {
   getInventoryReportV2,
   recordPaymentReceipt,
   recordSupplierPayment,
+  getPlotsReport,
 } = require("../controllers/reportController");
 
 // @route   GET /api/reports/income-statement
@@ -57,5 +58,10 @@ router.post("/payment-receipt", protect, recordPaymentReceipt);
 // @desc    Record supplier payment
 // @access  Private
 router.post("/supplier-payment", protect, recordSupplierPayment);
+
+// @route   GET /api/reports/plots
+// @desc    Get plots report with sales, customers, and stock information
+// @access  Private
+router.get("/plots", protect, getPlotsReport);
 
 module.exports = router;

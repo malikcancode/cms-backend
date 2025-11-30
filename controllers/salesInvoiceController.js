@@ -3,6 +3,7 @@ const Customer = require("../models/Customer");
 const User = require("../models/User");
 const Project = require("../models/Project");
 const Item = require("../models/Item");
+const Plot = require("../models/Plot");
 
 // @desc    Get all sales invoices
 // @route   GET /api/sales-invoices
@@ -147,6 +148,7 @@ exports.createSalesInvoice = async (req, res) => {
       address: address || "",
       telephone: telephone || "",
       items: items.map((item) => ({
+        itemType: item.itemType || "Inventory",
         itemCode: item.itemCode.toUpperCase(),
         description: item.description || "",
         quantity: item.quantity,
@@ -157,6 +159,8 @@ exports.createSalesInvoice = async (req, res) => {
         discount: item.discount || 0,
         netAmount:
           item.netAmount || item.quantity * item.rate - (item.discount || 0),
+        plot: item.plot || null,
+        item: item.item || null,
       })),
       inventoryLocation: inventoryLocation || "",
       project: project || null,
@@ -172,18 +176,82 @@ exports.createSalesInvoice = async (req, res) => {
     // Validate stock availability before creating invoice
     const stockValidation = [];
     for (const item of items) {
-      const itemRecord = await Item.findOne({
-        itemCode: item.itemCode.toUpperCase(),
-      });
-      if (itemRecord) {
-        const availableStock = itemRecord.currentStock || 0;
-        if (availableStock < item.quantity) {
-          stockValidation.push({
-            itemCode: item.itemCode,
-            itemName: itemRecord.name,
-            requested: item.quantity,
-            available: availableStock,
-          });
+      if (item.itemType === "Plot") {
+        // Validate plot stock
+        const plotRecord = await Plot.findOne({
+          plotNumber: item.itemCode.toUpperCase(),
+        });
+        if (plotRecord) {
+          // For plots, check if it's already Sold
+          // Allow selling if status is Available, Booked, Hold, or Under Construction
+          const allowedStatuses = [
+            "Available",
+            "Booked",
+            "Hold",
+            "Under Construction",
+          ];
+
+          // Check if plot is already sold AND has no available stock
+          if (plotRecord.status === "Sold" && plotRecord.availableStock === 0) {
+            stockValidation.push({
+              itemCode: item.itemCode,
+              itemName: plotRecord.plotType + " Plot",
+              requested: item.quantity,
+              available: 0,
+              type: "Plot",
+              reason: "Plot is already sold and has no available stock",
+            });
+          } else if (
+            plotRecord.status === "Sold" &&
+            plotRecord.totalStock - plotRecord.soldStock < item.quantity
+          ) {
+            stockValidation.push({
+              itemCode: item.itemCode,
+              itemName: plotRecord.plotType + " Plot",
+              requested: item.quantity,
+              available: plotRecord.totalStock - plotRecord.soldStock,
+              type: "Plot",
+              reason: "Insufficient stock available",
+            });
+          } else if (
+            !allowedStatuses.includes(plotRecord.status) &&
+            plotRecord.status !== "Sold"
+          ) {
+            stockValidation.push({
+              itemCode: item.itemCode,
+              itemName: plotRecord.plotType + " Plot",
+              requested: item.quantity,
+              available: 0,
+              type: "Plot",
+              reason: `Plot status is ${plotRecord.status}`,
+            });
+          } else if (plotRecord.totalStock < item.quantity) {
+            stockValidation.push({
+              itemCode: item.itemCode,
+              itemName: plotRecord.plotType + " Plot",
+              requested: item.quantity,
+              available: plotRecord.totalStock,
+              type: "Plot",
+              reason: "Requested quantity exceeds total stock",
+            });
+          }
+        }
+      } else {
+        // Validate inventory item stock
+        const itemRecord = await Item.findOne({
+          itemCode: item.itemCode.toUpperCase(),
+        });
+        if (itemRecord) {
+          const availableStock = itemRecord.currentStock || 0;
+          if (availableStock < item.quantity) {
+            stockValidation.push({
+              itemCode: item.itemCode,
+              itemName: itemRecord.name,
+              requested: item.quantity,
+              available: availableStock,
+              type: "Inventory",
+            });
+          }
         }
       }
     }
@@ -202,11 +270,39 @@ exports.createSalesInvoice = async (req, res) => {
 
     // Deduct stock for all items in the invoice
     for (const item of salesInvoice.items) {
-      const itemRecord = await Item.findOne({ itemCode: item.itemCode });
-      if (itemRecord) {
-        await Item.findByIdAndUpdate(itemRecord._id, {
-          $inc: { currentStock: -item.quantity },
-        });
+      if (item.itemType === "Plot") {
+        // Update plot stock
+        const plotRecord = await Plot.findOne({ plotNumber: item.itemCode });
+        if (plotRecord) {
+          // Increment sold stock
+          plotRecord.soldStock = (plotRecord.soldStock || 0) + item.quantity;
+          // Calculate available stock
+          plotRecord.availableStock =
+            plotRecord.totalStock - plotRecord.soldStock;
+
+          // If all stock is sold, mark as Sold and link customer
+          if (plotRecord.availableStock === 0) {
+            plotRecord.status = "Sold";
+            plotRecord.customer = customer;
+          }
+
+          // Update amount received and balance
+          const itemTotal = item.netAmount || item.quantity * item.rate;
+          plotRecord.amountReceived =
+            (plotRecord.amountReceived || 0) + (amountReceived || 0);
+          plotRecord.balance =
+            plotRecord.grossAmount - plotRecord.amountReceived;
+
+          await plotRecord.save();
+        }
+      } else {
+        // Update inventory item stock
+        const itemRecord = await Item.findOne({ itemCode: item.itemCode });
+        if (itemRecord) {
+          await Item.findByIdAndUpdate(itemRecord._id, {
+            $inc: { currentStock: -item.quantity },
+          });
+        }
       }
     }
 
@@ -316,29 +412,117 @@ exports.updateSalesInvoice = async (req, res) => {
     if (items && items.length > 0) {
       // First, restore stock for old items
       for (const oldItem of oldItems) {
-        const itemRecord = await Item.findOne({ itemCode: oldItem.itemCode });
-        if (itemRecord) {
-          await Item.findByIdAndUpdate(itemRecord._id, {
-            $inc: { currentStock: oldItem.quantity },
+        if (oldItem.itemType === "Plot") {
+          const plotRecord = await Plot.findOne({
+            plotNumber: oldItem.itemCode,
           });
+          if (plotRecord) {
+            // Restore sold stock
+            plotRecord.soldStock = Math.max(
+              0,
+              (plotRecord.soldStock || 0) - oldItem.quantity
+            );
+            plotRecord.availableStock =
+              plotRecord.totalStock - plotRecord.soldStock;
+
+            // If stock becomes available, change status
+            if (plotRecord.availableStock > 0 && plotRecord.status === "Sold") {
+              plotRecord.status = "Available";
+              plotRecord.customer = null;
+            }
+
+            await plotRecord.save();
+          }
+        } else {
+          const itemRecord = await Item.findOne({ itemCode: oldItem.itemCode });
+          if (itemRecord) {
+            await Item.findByIdAndUpdate(itemRecord._id, {
+              $inc: { currentStock: oldItem.quantity },
+            });
+          }
         }
       }
 
       // Validate stock availability for new items
       const stockValidation = [];
       for (const item of items) {
-        const itemRecord = await Item.findOne({
-          itemCode: item.itemCode.toUpperCase(),
-        });
-        if (itemRecord) {
-          const availableStock = itemRecord.currentStock || 0;
-          if (availableStock < item.quantity) {
-            stockValidation.push({
-              itemCode: item.itemCode,
-              itemName: itemRecord.name,
-              requested: item.quantity,
-              available: availableStock,
-            });
+        if (item.itemType === "Plot") {
+          const plotRecord = await Plot.findOne({
+            plotNumber: item.itemCode.toUpperCase(),
+          });
+          if (plotRecord) {
+            // For plots, check if it's already Sold AND has no available stock
+            const allowedStatuses = [
+              "Available",
+              "Booked",
+              "Hold",
+              "Under Construction",
+            ];
+
+            // Check if plot is sold with no stock available
+            if (
+              plotRecord.status === "Sold" &&
+              plotRecord.availableStock === 0
+            ) {
+              stockValidation.push({
+                itemCode: item.itemCode,
+                itemName: plotRecord.plotType + " Plot",
+                requested: item.quantity,
+                available: 0,
+                type: "Plot",
+                reason: "Plot is already sold",
+              });
+            } else if (
+              plotRecord.status === "Sold" &&
+              plotRecord.totalStock - plotRecord.soldStock < item.quantity
+            ) {
+              // If status is Sold but has some stock, check calculated available stock
+              stockValidation.push({
+                itemCode: item.itemCode,
+                itemName: plotRecord.plotType + " Plot",
+                requested: item.quantity,
+                available: plotRecord.totalStock - plotRecord.soldStock,
+                type: "Plot",
+                reason: "Insufficient available stock",
+              });
+            } else if (
+              plotRecord.status !== "Sold" &&
+              !allowedStatuses.includes(plotRecord.status)
+            ) {
+              stockValidation.push({
+                itemCode: item.itemCode,
+                itemName: plotRecord.plotType + " Plot",
+                requested: item.quantity,
+                available: 0,
+                type: "Plot",
+                reason: `Plot status is ${plotRecord.status}`,
+              });
+            } else if (plotRecord.totalStock < item.quantity) {
+              stockValidation.push({
+                itemCode: item.itemCode,
+                itemName: plotRecord.plotType + " Plot",
+                requested: item.quantity,
+                available: plotRecord.totalStock,
+                type: "Plot",
+                reason: "Requested quantity exceeds total stock",
+              });
+            }
+          }
+        } else {
+          const itemRecord = await Item.findOne({
+            itemCode: item.itemCode.toUpperCase(),
+          });
+          if (itemRecord) {
+            const availableStock = itemRecord.currentStock || 0;
+            if (availableStock < item.quantity) {
+              stockValidation.push({
+                itemCode: item.itemCode,
+                itemName: itemRecord.name,
+                requested: item.quantity,
+                available: availableStock,
+                type: "Inventory",
+              });
+            }
           }
         }
       }
@@ -347,11 +531,34 @@ exports.updateSalesInvoice = async (req, res) => {
       if (stockValidation.length > 0) {
         // Restore old stock state
         for (const oldItem of oldItems) {
-          const itemRecord = await Item.findOne({ itemCode: oldItem.itemCode });
-          if (itemRecord) {
-            await Item.findByIdAndUpdate(itemRecord._id, {
-              $inc: { currentStock: -oldItem.quantity },
+          if (oldItem.itemType === "Plot") {
+            const plotRecord = await Plot.findOne({
+              plotNumber: oldItem.itemCode,
             });
+            if (plotRecord) {
+              // Restore sold stock
+              plotRecord.soldStock =
+                (plotRecord.soldStock || 0) + oldItem.quantity;
+              plotRecord.availableStock =
+                plotRecord.totalStock - plotRecord.soldStock;
+
+              // Restore status if it was sold
+              if (plotRecord.availableStock === 0) {
+                plotRecord.status = "Sold";
+                plotRecord.customer = oldCustomer;
+              }
+
+              await plotRecord.save();
+            }
+          } else {
+            const itemRecord = await Item.findOne({
+              itemCode: oldItem.itemCode,
+            });
+            if (itemRecord) {
+              await Item.findByIdAndUpdate(itemRecord._id, {
+                $inc: { currentStock: -oldItem.quantity },
+              });
+            }
           }
         }
 
@@ -364,17 +571,48 @@ exports.updateSalesInvoice = async (req, res) => {
 
       // Deduct stock for new items
       for (const item of items) {
-        const itemRecord = await Item.findOne({
-          itemCode: item.itemCode.toUpperCase(),
-        });
-        if (itemRecord) {
-          await Item.findByIdAndUpdate(itemRecord._id, {
-            $inc: { currentStock: -item.quantity },
+        if (item.itemType === "Plot") {
+          const plotRecord = await Plot.findOne({
+            plotNumber: item.itemCode.toUpperCase(),
           });
+          if (plotRecord) {
+            // Increment sold stock
+            plotRecord.soldStock = (plotRecord.soldStock || 0) + item.quantity;
+            plotRecord.availableStock =
+              plotRecord.totalStock - plotRecord.soldStock;
+
+            // If all stock sold, mark as Sold and link customer
+            if (plotRecord.availableStock === 0) {
+              plotRecord.status = "Sold";
+              plotRecord.customer = customer || salesInvoice.customer;
+            }
+
+            // Update amount received
+            const newAmountReceived =
+              amountReceived !== undefined
+                ? amountReceived
+                : salesInvoice.amountReceived;
+            plotRecord.amountReceived =
+              (plotRecord.amountReceived || 0) + newAmountReceived;
+            plotRecord.balance =
+              plotRecord.grossAmount - plotRecord.amountReceived;
+
+            await plotRecord.save();
+          }
+        } else {
+          const itemRecord = await Item.findOne({
+            itemCode: item.itemCode.toUpperCase(),
+          });
+          if (itemRecord) {
+            await Item.findByIdAndUpdate(itemRecord._id, {
+              $inc: { currentStock: -item.quantity },
+            });
+          }
         }
       }
 
       salesInvoice.items = items.map((item) => ({
+        itemType: item.itemType || "Inventory",
         itemCode: item.itemCode.toUpperCase(),
         description: item.description || "",
         quantity: item.quantity,
@@ -385,6 +623,8 @@ exports.updateSalesInvoice = async (req, res) => {
         discount: item.discount || 0,
         netAmount:
           item.netAmount || item.quantity * item.rate - (item.discount || 0),
+        plot: item.plot || null,
+        item: item.item || null,
       }));
     }
 
@@ -478,11 +718,42 @@ exports.deleteSalesInvoice = async (req, res) => {
 
     // Restore stock for all items in the invoice (reverse the sale)
     for (const item of salesInvoice.items) {
-      const itemRecord = await Item.findOne({ itemCode: item.itemCode });
-      if (itemRecord) {
-        await Item.findByIdAndUpdate(itemRecord._id, {
-          $inc: { currentStock: item.quantity },
-        });
+      if (item.itemType === "Plot") {
+        const plotRecord = await Plot.findOne({ plotNumber: item.itemCode });
+        if (plotRecord) {
+          // Decrement sold stock
+          plotRecord.soldStock = Math.max(
+            0,
+            (plotRecord.soldStock || 0) - item.quantity
+          );
+          // Recalculate available stock
+          plotRecord.availableStock =
+            plotRecord.totalStock - plotRecord.soldStock;
+
+          // If stock becomes available again, change status back to Available
+          if (plotRecord.availableStock > 0 && plotRecord.status === "Sold") {
+            plotRecord.status = "Available";
+            plotRecord.customer = null; // Remove customer link
+          }
+
+          // Adjust amount received and balance
+          plotRecord.amountReceived = Math.max(
+            0,
+            (plotRecord.amountReceived || 0) -
+              (salesInvoice.amountReceived || 0)
+          );
+          plotRecord.balance =
+            plotRecord.grossAmount - plotRecord.amountReceived;
+
+          await plotRecord.save();
+        }
+      } else {
+        const itemRecord = await Item.findOne({ itemCode: item.itemCode });
+        if (itemRecord) {
+          await Item.findByIdAndUpdate(itemRecord._id, {
+            $inc: { currentStock: item.quantity },
+          });
+        }
       }
     }
 

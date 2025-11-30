@@ -139,8 +139,10 @@ const getIncomeStatement = async (req, res) => {
 // @access  Private
 const getInventoryReport = async (req, res) => {
   try {
-    // Get all items from inventory
-    const items = await Item.find().sort({ name: 1 });
+    // Get all items from inventory (exclude Plots - they are not consumable inventory)
+    const items = await Item.find({
+      itemType: { $ne: "Plot" },
+    }).sort({ name: 1 });
 
     // Get all purchases to calculate stock
     const purchases = await Purchase.find();
@@ -700,6 +702,173 @@ const recordSupplierPayment = async (req, res) => {
   }
 };
 
+// @desc    Get Plots Report
+// @route   GET /api/reports/plots
+// @access  Private
+const getPlotsReport = async (req, res) => {
+  try {
+    const Plot = require("../models/Plot");
+    const { project, status, startDate, endDate } = req.query;
+
+    // Build filter
+    const filter = {};
+    if (project) filter.project = project;
+    if (status) filter.status = status;
+
+    // Date filter for sales
+    if (startDate || endDate) {
+      filter.saleDate = {};
+      if (startDate) filter.saleDate.$gte = new Date(startDate);
+      if (endDate) filter.saleDate.$lte = new Date(endDate);
+    }
+
+    // Get all plots matching filter
+    const plots = await Plot.find(filter)
+      .populate("project", "name code location")
+      .populate("customer", "name code email phone address")
+      .populate("createdBy", "name email")
+      .sort({ plotNumber: 1 });
+
+    // Calculate summary statistics
+    const summary = {
+      totalPlots: plots.length,
+      availablePlots: plots.filter((p) => p.status === "Available").length,
+      bookedPlots: plots.filter((p) => p.status === "Booked").length,
+      soldPlots: plots.filter((p) => p.status === "Sold").length,
+      totalStock: plots.reduce((sum, p) => sum + (p.totalStock || 0), 0),
+      soldStock: plots.reduce((sum, p) => sum + (p.soldStock || 0), 0),
+      availableStock: plots.reduce(
+        (sum, p) => sum + (p.availableStock || 0),
+        0
+      ),
+      totalInventoryValue: plots
+        .filter((p) => p.status === "Available")
+        .reduce((sum, p) => sum + (p.basePrice || 0), 0),
+      totalSalesValue: plots
+        .filter((p) => p.status === "Sold")
+        .reduce(
+          (sum, p) => sum + (p.grossAmount || p.finalPrice || p.basePrice || 0),
+          0
+        ),
+      totalAmountReceived: plots
+        .filter((p) => p.status === "Sold" || p.status === "Booked")
+        .reduce((sum, p) => sum + (p.amountReceived || 0), 0),
+      totalBalanceDue: plots
+        .filter((p) => p.status === "Sold" || p.status === "Booked")
+        .reduce((sum, p) => sum + (p.balance || 0), 0),
+    };
+
+    // Group by project
+    const byProject = {};
+    plots.forEach((plot) => {
+      const projectName = plot.project?.name || "Unassigned";
+      if (!byProject[projectName]) {
+        byProject[projectName] = {
+          projectName,
+          projectCode: plot.project?.code,
+          plots: [],
+          count: 0,
+          sold: 0,
+          available: 0,
+          totalValue: 0,
+          totalReceived: 0,
+          totalBalance: 0,
+        };
+      }
+      byProject[projectName].plots.push(plot);
+      byProject[projectName].count++;
+      if (plot.status === "Sold") byProject[projectName].sold++;
+      if (plot.status === "Available") byProject[projectName].available++;
+      byProject[projectName].totalValue +=
+        plot.grossAmount || plot.finalPrice || plot.basePrice || 0;
+      byProject[projectName].totalReceived += plot.amountReceived || 0;
+      byProject[projectName].totalBalance += plot.balance || 0;
+    });
+
+    // Group by customer
+    const byCustomer = {};
+    plots
+      .filter((p) => p.customer)
+      .forEach((plot) => {
+        const customerId = plot.customer._id.toString();
+        if (!byCustomer[customerId]) {
+          byCustomer[customerId] = {
+            customer: plot.customer,
+            plots: [],
+            count: 0,
+            totalValue: 0,
+            totalPaid: 0,
+            totalBalance: 0,
+          };
+        }
+        byCustomer[customerId].plots.push({
+          plotNumber: plot.plotNumber,
+          project: plot.project?.name,
+          size: plot.plotSize,
+          unit: plot.unit,
+          type: plot.plotType,
+          price: plot.grossAmount || plot.finalPrice || plot.basePrice,
+          amountReceived: plot.amountReceived,
+          balance: plot.balance,
+          saleDate: plot.saleDate,
+          status: plot.status,
+        });
+        byCustomer[customerId].count++;
+        byCustomer[customerId].totalValue +=
+          plot.grossAmount || plot.finalPrice || plot.basePrice || 0;
+        byCustomer[customerId].totalPaid += plot.amountReceived || 0;
+        byCustomer[customerId].totalBalance += plot.balance || 0;
+      });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        plots: plots.map((p) => ({
+          _id: p._id,
+          plotNumber: p.plotNumber,
+          project: p.project,
+          block: p.block,
+          phase: p.phase,
+          plotSize: p.plotSize,
+          unit: p.unit,
+          plotType: p.plotType,
+          facing: p.facing,
+          status: p.status,
+          basePrice: p.basePrice,
+          rate: p.rate,
+          finalPrice: p.finalPrice,
+          quantity: p.quantity,
+          totalStock: p.totalStock,
+          soldStock: p.soldStock,
+          availableStock: p.availableStock,
+          grossAmount: p.grossAmount,
+          customer: p.customer,
+          paymentTerms: p.paymentTerms,
+          bookingDate: p.bookingDate,
+          saleDate: p.saleDate,
+          bookingAmount: p.bookingAmount,
+          amountReceived: p.amountReceived,
+          balance: p.balance,
+          registrationDate: p.registrationDate,
+          possessionDate: p.possessionDate,
+          features: p.features,
+          remarks: p.remarks,
+        })),
+        summary,
+        byProject: Object.values(byProject),
+        byCustomer: Object.values(byCustomer),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching plots report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching plots report",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getIncomeStatement,
   getInventoryReport,
@@ -710,4 +879,5 @@ module.exports = {
   getInventoryReportV2,
   recordPaymentReceipt,
   recordSupplierPayment,
+  getPlotsReport,
 };

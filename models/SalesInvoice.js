@@ -1,9 +1,18 @@
 const mongoose = require("mongoose");
 
 const salesInvoiceItemSchema = new mongoose.Schema({
+  itemType: {
+    type: String,
+    enum: ["Inventory", "Plot"],
+    default: "Inventory",
+  },
   item: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Item",
+    refPath: "items.itemType",
+  },
+  plot: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Plot",
   },
   itemCode: {
     type: String,
@@ -278,7 +287,19 @@ salesInvoiceSchema.post("save", async function (doc) {
       }
 
       if (userId) {
-        await AccountingService.createSalesJournalEntry(doc, userId);
+        // Check if this invoice contains plots
+        const hasPlots = doc.items.some((item) => item.itemType === "Plot");
+
+        if (hasPlots) {
+          // Create plot sales invoice journal entry
+          await AccountingService.createPlotSalesInvoiceJournalEntry(
+            doc,
+            userId
+          );
+        } else {
+          // Create regular sales journal entry
+          await AccountingService.createSalesJournalEntry(doc, userId);
+        }
       }
     } catch (error) {
       console.error(

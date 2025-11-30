@@ -2,6 +2,8 @@ const Project = require("../models/Project");
 const SalesInvoice = require("../models/SalesInvoice");
 const Purchase = require("../models/Purchase");
 const BankPayment = require("../models/BankPayment");
+const Plot = require("../models/Plot");
+const Item = require("../models/Item");
 
 // @desc    Get dashboard statistics
 // @route   GET /api/dashboard/stats
@@ -218,7 +220,96 @@ const getRecentProjects = async (req, res) => {
   }
 };
 
+// @desc    Get plot statistics for dashboard
+// @route   GET /api/dashboard/plot-stats
+// @access  Private
+const getPlotStats = async (req, res) => {
+  try {
+    // Get all plots, not just active ones, to show sold plots too
+    const plots = await Plot.find();
+
+    const stats = {
+      total: plots.length,
+      available: plots.filter((p) => p.status === "Available").length,
+      booked: plots.filter((p) => p.status === "Booked").length,
+      sold: plots.filter((p) => p.status === "Sold").length,
+      underConstruction: plots.filter((p) => p.status === "Under Construction")
+        .length,
+      totalInventoryValue: plots
+        .filter((p) => p.status === "Available")
+        .reduce((sum, p) => sum + (p.basePrice || 0), 0),
+      totalSalesValue: plots
+        .filter((p) => p.status === "Sold")
+        .reduce(
+          (sum, p) => sum + (p.grossAmount || p.finalPrice || p.basePrice || 0),
+          0
+        ),
+      totalReceived: plots
+        .filter((p) => p.status === "Sold" || p.status === "Booked")
+        .reduce((sum, p) => sum + (p.amountReceived || 0), 0),
+      totalOutstanding: plots
+        .filter((p) => p.status === "Sold" || p.status === "Booked")
+        .reduce((sum, p) => sum + (p.balance || 0), 0),
+    };
+
+    res.status(200).json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    console.error("Error fetching plot stats:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching plot statistics",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get inventory statistics (materials only, no plots)
+// @route   GET /api/dashboard/inventory-stats
+// @access  Private
+const getInventoryStats = async (req, res) => {
+  try {
+    // Get only materials, equipment, services - exclude Plots
+    const items = await Item.find({
+      isActive: true,
+      itemType: { $ne: "Plot" },
+    });
+
+    const stats = {
+      totalItems: items.length,
+      lowStockCount: items.filter(
+        (item) =>
+          item.currentStock > 0 &&
+          item.currentStock <= (item.minStockLevel || 0)
+      ).length,
+      outOfStockCount: items.filter((item) => item.currentStock <= 0).length,
+      totalInventoryValue: items.reduce(
+        (sum, item) =>
+          sum + (item.currentStock || 0) * (item.purchasePrice || 0),
+        0
+      ),
+      categories: [...new Set(items.map((item) => item.categoryName))].length,
+    };
+
+    res.status(200).json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    console.error("Error fetching inventory stats:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching inventory statistics",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getRecentProjects,
+  getPlotStats,
+  getInventoryStats,
 };

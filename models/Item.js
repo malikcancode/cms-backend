@@ -27,6 +27,12 @@ const itemSchema = new mongoose.Schema(
     },
 
     // Inventory Item Information
+    itemType: {
+      type: String,
+      enum: ["Material", "Equipment", "Plot", "Service"],
+      default: "Material",
+      trim: true,
+    },
     itemCode: {
       type: String,
       required: [true, "Item code is required"],

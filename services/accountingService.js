@@ -830,6 +830,161 @@ class AccountingService {
   }
 
   /**
+   * Create journal entry for a plot sale
+   * This follows the standard format:
+   * Debit: Accounts Receivable (full amount)
+   * Debit: Cash Account (amount received)
+   * Credit: Property Sales Revenue (total of debits)
+   */
+  static async createPlotSaleJournalEntry(plot, userId) {
+    const revenueAccount = await this.getOrCreateAccount(
+      "4001",
+      "Property Sales Revenue",
+      "Revenue"
+    );
+    const receivableAccount = await this.getOrCreateAccount(
+      "1003",
+      "Accounts Receivable",
+      "Asset"
+    );
+    const cashAccount = await this.getOrCreateAccount(
+      "1001",
+      "Cash Account",
+      "Asset"
+    );
+
+    const lines = [];
+    const finalPrice = plot.finalPrice || plot.grossAmount || plot.basePrice;
+
+    // Debit: Accounts Receivable (full amount)
+    lines.push({
+      account: receivableAccount._id,
+      accountCode: receivableAccount.code || "1003",
+      accountName: receivableAccount.name || "Accounts Receivable",
+      accountType: "Asset",
+      debit: finalPrice,
+      credit: 0,
+      description: `Plot sale receivable for ${plot.plotNumber}`,
+    });
+
+    // Debit: Cash Account (amount received)
+    if (plot.amountReceived > 0) {
+      lines.push({
+        account: cashAccount._id,
+        accountCode: cashAccount.code || "1001",
+        accountName: cashAccount.name || "Cash Account",
+        accountType: "Asset",
+        debit: plot.amountReceived,
+        credit: 0,
+        description: `Cash received for plot ${plot.plotNumber}`,
+      });
+    }
+
+    // Credit: Property Sales Revenue (total = receivable + cash)
+    const totalCredit = finalPrice + (plot.amountReceived || 0);
+    lines.push({
+      account: revenueAccount._id,
+      accountCode: revenueAccount.code || "4001",
+      accountName: revenueAccount.name || "Property Sales Revenue",
+      accountType: "Revenue",
+      debit: 0,
+      credit: totalCredit,
+      description: `Sale of plot ${plot.plotNumber}`,
+    });
+
+    const entryData = {
+      date: plot.saleDate || new Date(),
+      transactionType: "Sale",
+      sourceTransaction: {
+        model: "Plot",
+        id: plot._id,
+        reference: plot.plotNumber,
+      },
+      project: plot.project,
+      description: `Plot Sale ${plot.plotNumber}`,
+      lines: lines,
+    };
+
+    return await this.createJournalEntry(entryData, userId);
+  }
+
+  /**
+   * Create journal entry for a plot sales invoice
+   * Similar format for consistency with plot sales
+   */
+  static async createPlotSalesInvoiceJournalEntry(salesInvoice, userId) {
+    const revenueAccount = await this.getOrCreateAccount(
+      "4001",
+      "Property Sales Revenue",
+      "Revenue"
+    );
+    const receivableAccount = await this.getOrCreateAccount(
+      "1003",
+      "Accounts Receivable",
+      "Asset"
+    );
+    const cashAccount = await this.getOrCreateAccount(
+      "1001",
+      "Cash Account",
+      "Asset"
+    );
+
+    const lines = [];
+
+    // Debit: Accounts Receivable (full amount)
+    lines.push({
+      account: receivableAccount._id,
+      accountCode: receivableAccount.code || "1003",
+      accountName: receivableAccount.name || "Accounts Receivable",
+      accountType: "Asset",
+      debit: salesInvoice.netTotal,
+      credit: 0,
+      description: `Plot sales receivable from ${salesInvoice.customerName}`,
+    });
+
+    // Debit: Cash Account (if payment received)
+    if (salesInvoice.amountReceived > 0) {
+      lines.push({
+        account: cashAccount._id,
+        accountCode: cashAccount.code || "1001",
+        accountName: cashAccount.name || "Cash Account",
+        accountType: "Asset",
+        debit: salesInvoice.amountReceived,
+        credit: 0,
+        description: `Cash received from ${salesInvoice.customerName}`,
+      });
+    }
+
+    // Credit: Property Sales Revenue (total)
+    const totalCredit =
+      salesInvoice.netTotal + (salesInvoice.amountReceived || 0);
+    lines.push({
+      account: revenueAccount._id,
+      accountCode: revenueAccount.code || "4001",
+      accountName: revenueAccount.name || "Property Sales Revenue",
+      accountType: "Revenue",
+      debit: 0,
+      credit: totalCredit,
+      description: `Plot sales revenue from Invoice ${salesInvoice.serialNo}`,
+    });
+
+    const entryData = {
+      date: salesInvoice.date,
+      transactionType: "Sale",
+      sourceTransaction: {
+        model: "SalesInvoice",
+        id: salesInvoice._id,
+        reference: salesInvoice.serialNo,
+      },
+      project: salesInvoice.project,
+      description: `Plot Sales Invoice ${salesInvoice.serialNo} - ${salesInvoice.customerName}`,
+      lines: lines,
+    };
+
+    return await this.createJournalEntry(entryData, userId);
+  }
+
+  /**
    * Reverse a journal entry
    */
   static async reverseJournalEntry(entryId, userId, reason) {

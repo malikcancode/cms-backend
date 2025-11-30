@@ -59,6 +59,7 @@ const reportRoutes = require("./routes/reportRoutes");
 const journalEntryRoutes = require("./routes/journalEntryRoutes");
 const generalLedgerRoutes = require("./routes/generalLedgerRoutes");
 const cashPaymentRoutes = require("./routes/cashPaymentRoutes");
+const plotRoutes = require("./routes/plotRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -67,6 +68,7 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/chartofaccounts", chartOfAccountRoutes);
 app.use("/api/bankpayments", bankPaymentRoutes);
 app.use("/api/cashpayments", cashPaymentRoutes);
+app.use("/api/plots", plotRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/purchases", purchaseRoutes);
 app.use("/api/suppliers", supplierRoutes);
