@@ -2,9 +2,6 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const mongoSanitize = require("express-mongo-sanitize");
-const xss = require("xss-clean");
-const hpp = require("hpp");
 const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 const ensureDbConnection = require("./middleware/dbConnection");
@@ -91,13 +88,120 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 // Data sanitization against NoSQL query injection
-app.use(mongoSanitize());
+// Custom implementation for Express 5.x compatibility
+app.use((req, res, next) => {
+  // Helper function to recursively sanitize objects
+  const sanitizeObject = (obj) => {
+    if (obj === null || typeof obj !== "object") return obj;
+
+    const sanitized = Array.isArray(obj) ? [] : {};
+
+    for (const [key, value] of Object.entries(obj)) {
+      // Only remove keys that start with $ (MongoDB operators)
+      // Don't sanitize dots in keys as they're usually safe in property names
+      const sanitizedKey = key.replace(/^\$+/, "");
+
+      if (typeof value === "object" && value !== null) {
+        sanitized[sanitizedKey] = sanitizeObject(value);
+      } else if (typeof value === "string") {
+        // Only remove $ from string values (MongoDB operators like $where)
+        // Keep dots as they're valid in emails, URLs, etc.
+        sanitized[sanitizedKey] = value.replace(/\$/g, "");
+      } else {
+        sanitized[sanitizedKey] = value;
+      }
+    }
+
+    return sanitized;
+  };
+
+  // Sanitize body (writable)
+  if (req.body && typeof req.body === "object") {
+    req.body = sanitizeObject(req.body);
+  }
+
+  // Sanitize params (writable)
+  if (req.params && typeof req.params === "object") {
+    req.params = sanitizeObject(req.params);
+  }
+
+  // Store sanitized query separately (req.query is read-only in Express 5.x)
+  if (req.query && typeof req.query === "object") {
+    req.sanitizedQuery = sanitizeObject(req.query);
+  }
+
+  next();
+});
 
 // Data sanitization against XSS attacks
-app.use(xss());
+// Custom implementation for Express 5.x compatibility
+app.use((req, res, next) => {
+  // Helper function to sanitize XSS from strings
+  const sanitizeXSS = (value) => {
+    if (typeof value === "string") {
+      return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#x27;")
+        .replace(/\//g, "&#x2F;");
+    }
+    return value;
+  };
+
+  // Recursively sanitize objects
+  const sanitizeObjectXSS = (obj) => {
+    if (obj === null || typeof obj !== "object") return obj;
+
+    const sanitized = Array.isArray(obj) ? [] : {};
+
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === "object" && value !== null) {
+        sanitized[key] = sanitizeObjectXSS(value);
+      } else {
+        sanitized[key] = sanitizeXSS(value);
+      }
+    }
+
+    return sanitized;
+  };
+
+  // Sanitize body
+  if (req.body && typeof req.body === "object") {
+    req.body = sanitizeObjectXSS(req.body);
+  }
+
+  // Sanitize params
+  if (req.params && typeof req.params === "object") {
+    req.params = sanitizeObjectXSS(req.params);
+  }
+
+  // Add XSS sanitized query if not already done
+  if (req.query && typeof req.query === "object" && !req.sanitizedQuery) {
+    req.sanitizedQuery = sanitizeObjectXSS(req.query);
+  } else if (req.sanitizedQuery) {
+    req.sanitizedQuery = sanitizeObjectXSS(req.sanitizedQuery);
+  }
+
+  next();
+});
 
 // Prevent HTTP Parameter Pollution attacks
-app.use(hpp());
+// Custom implementation for Express 5.x compatibility
+app.use((req, res, next) => {
+  // HPP protection: if sanitizedQuery exists, ensure no array pollution
+  if (req.sanitizedQuery && typeof req.sanitizedQuery === "object") {
+    const cleaned = {};
+    for (const [key, value] of Object.entries(req.sanitizedQuery)) {
+      // If value is an array, take only the last value
+      cleaned[key] = Array.isArray(value) ? value[value.length - 1] : value;
+    }
+    req.sanitizedQuery = cleaned;
+  }
+
+  next();
+});
 
 // Log environment check
 console.log("Environment check:", {

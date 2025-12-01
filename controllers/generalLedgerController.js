@@ -6,7 +6,9 @@ const AccountingService = require("../services/accountingService");
 // @access  Private
 const getGeneralLedger = async (req, res) => {
   try {
-    const { accountCode, startDate, endDate, accountType, project } = req.query;
+    const queryParams = req.sanitizedQuery || req.query;
+    const { accountCode, startDate, endDate, accountType, project } =
+      queryParams;
 
     // Build query
     const query = { status: "Active" };
@@ -46,7 +48,8 @@ const getGeneralLedger = async (req, res) => {
 const getAccountLedger = async (req, res) => {
   try {
     const { accountCode } = req.params;
-    const { startDate, endDate } = req.query;
+    const queryParams = req.sanitizedQuery || req.query;
+    const { startDate, endDate } = queryParams;
 
     const ledger = await AccountingService.getAccountLedger(
       accountCode,
@@ -74,7 +77,8 @@ const getAccountLedger = async (req, res) => {
 const getAccountBalance = async (req, res) => {
   try {
     const { accountCode } = req.params;
-    const { asOfDate } = req.query;
+    const queryParams = req.sanitizedQuery || req.query;
+    const { asOfDate } = queryParams;
 
     const balance = await AccountingService.getAccountBalance(
       accountCode,
@@ -100,7 +104,8 @@ const getAccountBalance = async (req, res) => {
 // @access  Private
 const getTrialBalance = async (req, res) => {
   try {
-    const { asOfDate } = req.query;
+    const queryParams = req.sanitizedQuery || req.query;
+    const { asOfDate } = queryParams;
 
     const trialBalance = await AccountingService.getTrialBalance(
       asOfDate ? new Date(asOfDate) : new Date()

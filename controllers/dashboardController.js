@@ -138,7 +138,8 @@ const getDashboardStats = async (req, res) => {
 // @access  Private
 const getRecentProjects = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 5;
+    const query = req.sanitizedQuery || req.query;
+    const limit = parseInt(query.limit) || 5;
 
     // Get recent projects sorted by creation date
     const projects = await Project.find()

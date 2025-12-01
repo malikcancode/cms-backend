@@ -7,7 +7,8 @@ const Customer = require("../models/Customer");
 // @access  Private
 exports.getAllPlots = async (req, res) => {
   try {
-    const { project, status } = req.query;
+    const query = req.sanitizedQuery || req.query;
+    const { project, status } = query;
 
     const filter = {};
     if (project) filter.project = project;
