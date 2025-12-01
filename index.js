@@ -1,11 +1,75 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const mongoSanitize = require("express-mongo-sanitize");
+const xss = require("xss-clean");
+const hpp = require("hpp");
+const rateLimit = require("express-rate-limit");
+const cookieParser = require("cookie-parser");
 const ensureDbConnection = require("./middleware/dbConnection");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// ============================================
+// SECURITY MIDDLEWARE CONFIGURATION
+// ============================================
+
+// Set security HTTP headers using Helmet
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true,
+    },
+    frameguard: { action: "deny" },
+    xssFilter: true,
+    noSniff: true,
+    ieNoOpen: true,
+    hidePoweredBy: true,
+  })
+);
+
+// Rate limiting to prevent brute force attacks
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: "Too many requests from this IP, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting to all routes
+app.use(limiter);
+
+// Stricter rate limiting for authentication routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 login attempts per windowMs
+  message: "Too many login attempts, please try again after 15 minutes.",
+  skipSuccessfulRequests: true,
+});
+
+// Apply auth limiter to login routes
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/register", authLimiter);
+
+// CORS configuration
 app.use(
   cors({
     origin: [
@@ -18,8 +82,22 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// Body parser with size limits to prevent payload attacks
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Cookie parser for secure cookie handling
+app.use(cookieParser());
+
+// Data sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+// Data sanitization against XSS attacks
+app.use(xss());
+
+// Prevent HTTP Parameter Pollution attacks
+app.use(hpp());
 
 // Log environment check
 console.log("Environment check:", {

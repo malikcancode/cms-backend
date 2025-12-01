@@ -1,11 +1,20 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
+const { blacklistToken } = require("../middleware/authMiddleware");
 
-// Generate JWT Token
+// Generate JWT Token with enhanced security
 const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-    expiresIn: "7d",
-  });
+  return jwt.sign(
+    { 
+      id: userId,
+      iat: Math.floor(Date.now() / 1000), // Issued at timestamp
+    }, 
+    process.env.JWT_SECRET, 
+    {
+      expiresIn: "7d",
+      algorithm: "HS256", // Explicitly specify algorithm
+    }
+  );
 };
 
 // @desc    Register a new user (Admin only via Postman)
@@ -161,6 +170,33 @@ exports.getMe = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching user",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Logout user (blacklist token)
+// @route   POST /api/auth/logout
+// @access  Private
+exports.logout = async (req, res) => {
+  try {
+    // Get token from request (set by protect middleware)
+    const token = req.token;
+    
+    if (token) {
+      // Add token to blacklist
+      blacklistToken(token);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    console.error("Logout error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error logging out",
       error: error.message,
     });
   }
