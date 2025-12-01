@@ -5,11 +5,11 @@ const { blacklistToken } = require("../middleware/authMiddleware");
 // Generate JWT Token with enhanced security
 const generateToken = (userId) => {
   return jwt.sign(
-    { 
+    {
       id: userId,
       iat: Math.floor(Date.now() / 1000), // Issued at timestamp
-    }, 
-    process.env.JWT_SECRET, 
+    },
+    process.env.JWT_SECRET,
     {
       expiresIn: "7d",
       algorithm: "HS256", // Explicitly specify algorithm
@@ -128,6 +128,7 @@ exports.login = async (req, res) => {
           name: user.name,
           email: user.email,
           role: user.role,
+          customPermissions: user.customPermissions,
         },
         token,
       },
@@ -163,6 +164,7 @@ exports.getMe = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        customPermissions: user.customPermissions,
       },
     });
   } catch (error) {
@@ -182,7 +184,7 @@ exports.logout = async (req, res) => {
   try {
     // Get token from request (set by protect middleware)
     const token = req.token;
-    
+
     if (token) {
       // Add token to blacklist
       blacklistToken(token);

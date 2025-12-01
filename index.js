@@ -13,6 +13,22 @@ const PORT = process.env.PORT || 5000;
 // SECURITY MIDDLEWARE CONFIGURATION
 // ============================================
 
+// CORS configuration - MUST be first to handle preflight requests
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      process.env.FRONTEND_URL,
+    ].filter(Boolean),
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  })
+);
+
 // Set security HTTP headers using Helmet
 app.use(
   helmet({
@@ -49,6 +65,7 @@ const limiter = rateLimit({
   message: "Too many requests from this IP, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method === "OPTIONS", // Skip rate limiting for OPTIONS requests
 });
 
 // Apply rate limiting to all routes
@@ -60,25 +77,12 @@ const authLimiter = rateLimit({
   max: 5, // Limit each IP to 5 login attempts per windowMs
   message: "Too many login attempts, please try again after 15 minutes.",
   skipSuccessfulRequests: true,
+  skip: (req) => req.method === "OPTIONS", // Skip rate limiting for OPTIONS requests
 });
 
 // Apply auth limiter to login routes
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
-
-// CORS configuration
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      process.env.FRONTEND_URL,
-    ].filter(Boolean),
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
 
 // Body parser with size limits to prevent payload attacks
 app.use(express.json({ limit: "10mb" }));
