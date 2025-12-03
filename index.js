@@ -73,7 +73,7 @@ app.use(limiter);
 
 // Stricter rate limiting for authentication routes
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 10 * 60 * 1000, // 10 minutes
   max: 5, // Limit each IP to 5 login attempts per windowMs
   message: "Too many login attempts, please try again after 15 minutes.",
   skipSuccessfulRequests: true,

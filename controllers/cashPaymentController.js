@@ -2,6 +2,8 @@ const CashPayment = require("../models/CashPayment");
 const Project = require("../models/Project");
 const User = require("../models/User");
 const ChartOfAccount = require("../models/ChartOfAccount");
+const JournalEntry = require("../models/JournalEntry");
+const AccountingService = require("../services/accountingService");
 
 // @desc    Get all cash payments
 // @route   GET /api/cash-payments
@@ -195,6 +197,7 @@ exports.updateCashPayment = async (req, res) => {
     if (remarks !== undefined) cashPayment.remarks = remarks;
     if (typeof cancel === "boolean") cashPayment.cancel = cancel;
 
+    let paymentLinesChanged = false;
     if (paymentLines && paymentLines.length > 0) {
       // Recalculate total amount
       const totalAmount = paymentLines.reduce(
@@ -203,6 +206,7 @@ exports.updateCashPayment = async (req, res) => {
       );
       cashPayment.paymentLines = paymentLines;
       cashPayment.totalAmount = totalAmount;
+      paymentLinesChanged = true;
     }
 
     await cashPayment.save();
@@ -217,6 +221,44 @@ exports.updateCashPayment = async (req, res) => {
       message: "Cash payment updated successfully",
       data: cashPayment,
     });
+
+    // Keep accounting entries in sync
+    try {
+      const existingEntry = await JournalEntry.findOne({
+        status: "Posted",
+        "sourceTransaction.model": "CashPayment",
+        "sourceTransaction.id": cashPayment._id,
+      });
+
+      // If cancelled, reverse existing journal entry
+      if (cashPayment.cancel && existingEntry) {
+        await AccountingService.reverseJournalEntry(
+          existingEntry._id,
+          req.user._id,
+          `Cash Payment ${cashPayment.serialNo} cancelled`
+        );
+      }
+      // If active and lines changed or amounts changed, refresh JE
+      else if (!cashPayment.cancel) {
+        if (existingEntry && paymentLinesChanged) {
+          await AccountingService.reverseJournalEntry(
+            existingEntry._id,
+            req.user._id,
+            `Cash Payment ${cashPayment.serialNo} updated`
+          );
+        }
+        // Create fresh JE if none exists or after reversal
+        if (!existingEntry || paymentLinesChanged) {
+          await AccountingService.createCashPaymentJournalEntry(
+            cashPayment,
+            req.user._id
+          );
+        }
+      }
+    } catch (accErr) {
+      console.error("Accounting sync (cash payment update) error:", accErr);
+      // Do not fail the API due to accounting sync; it's logged for admins
+    }
   } catch (error) {
     console.error("Update cash payment error:", error);
     res.status(500).json({
@@ -239,6 +281,24 @@ exports.deleteCashPayment = async (req, res) => {
         success: false,
         message: "Cash payment not found",
       });
+    }
+
+    // Reverse associated journal entry if exists
+    try {
+      const existingEntry = await JournalEntry.findOne({
+        status: "Posted",
+        "sourceTransaction.model": "CashPayment",
+        "sourceTransaction.id": cashPayment._id,
+      });
+      if (existingEntry) {
+        await AccountingService.reverseJournalEntry(
+          existingEntry._id,
+          req.user._id,
+          `Cash Payment ${cashPayment.serialNo} deleted`
+        );
+      }
+    } catch (accErr) {
+      console.error("Accounting reversal (cash payment delete) error:", accErr);
     }
 
     await CashPayment.findByIdAndDelete(req.params.id);
