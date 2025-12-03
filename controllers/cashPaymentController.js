@@ -384,3 +384,55 @@ exports.getCashPaymentsByDateRange = async (req, res) => {
     });
   }
 };
+
+// @desc    Get expense accounts from Chart of Accounts (sub-accounts only)
+// @route   GET /api/cash-payments/expense-accounts
+// @access  Private
+exports.getExpenseAccounts = async (req, res) => {
+  try {
+    const accounts = await ChartOfAccount.find();
+
+    // Flatten all sub accounts with their parent info
+    const expenseAccounts = [];
+
+    accounts.forEach((account) => {
+      if (account.subAccounts && account.subAccounts.length > 0) {
+        account.subAccounts.forEach((subAccount) => {
+          expenseAccounts.push({
+            accountCode: subAccount.code,
+            accountName: subAccount.type,
+            mainAccountType: account.mainAccountType,
+            mainTypeCode: account.mainTypeCode,
+            financialComponent: account.financialComponent,
+          });
+        });
+      }
+
+      // Also include list accounts if they exist
+      if (account.listAccounts && account.listAccounts.length > 0) {
+        account.listAccounts.forEach((listAccount) => {
+          expenseAccounts.push({
+            accountCode: listAccount.code,
+            accountName: listAccount.name,
+            mainAccountType: account.mainAccountType,
+            mainTypeCode: account.mainTypeCode,
+            financialComponent: account.financialComponent,
+          });
+        });
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      count: expenseAccounts.length,
+      data: expenseAccounts,
+    });
+  } catch (error) {
+    console.error("Error fetching expense accounts:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: error.message,
+    });
+  }
+};

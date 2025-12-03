@@ -191,23 +191,89 @@ PlotSchema.pre("save", function () {
   }
 });
 
-// Post-save middleware to create journal entry when plot is sold
-PlotSchema.post("save", async function (doc) {
-  // Only create journal entry when status changes to "Sold" and has final price
-  if (doc.status === "Sold" && doc.finalPrice && doc.saleDate) {
-    try {
-      const AccountingService = require("../services/accountingService");
-
-      if (doc.createdBy) {
-        await AccountingService.createPlotSaleJournalEntry(doc, doc.createdBy);
-      }
-    } catch (error) {
-      console.error(
-        "Error creating journal entry for plot sale:",
-        error.message
-      );
-      // Don't throw error to prevent plot update failure
+// Post-save middleware to create journal entry when plot is booked or sold
+PlotSchema.post("save", async function (doc, next) {
+  try {
+    // Skip if plot is being soft-deleted
+    if (!doc.isActive) {
+      return;
     }
+
+    const AccountingService = require("../services/accountingService");
+    const Customer = require("./Customer");
+    const JournalEntry = require("./JournalEntry");
+
+    // Check if this is a booking
+    if (doc.status === "Booked" && doc.customer && doc.bookingDate) {
+      // Check if journal entry already exists for this booking
+      const existingBookingEntry = await JournalEntry.findOne({
+        "sourceTransaction.model": "Plot",
+        "sourceTransaction.id": doc._id,
+        "sourceTransaction.reference": doc.plotNumber,
+        transactionType: "Booking",
+      });
+
+      if (!existingBookingEntry && doc.createdBy) {
+        // Create journal entry for booking
+        await AccountingService.createPlotBookingJournalEntry(
+          doc,
+          doc.createdBy
+        );
+
+        // Update customer balance
+        if (doc.customer) {
+          const totalAmount =
+            doc.finalPrice || doc.grossAmount || doc.basePrice || 0;
+          const balanceDue = totalAmount - (doc.amountReceived || 0);
+
+          await Customer.findByIdAndUpdate(doc.customer, {
+            $inc: {
+              totalPurchase: totalAmount,
+              balance: balanceDue,
+            },
+          });
+        }
+      }
+    }
+    // Check if this is a sale (after booking)
+    else if (doc.status === "Sold" && doc.finalPrice && doc.saleDate) {
+      // Check if journal entry already exists for this sale
+      const existingSaleEntry = await JournalEntry.findOne({
+        "sourceTransaction.model": "Plot",
+        "sourceTransaction.id": doc._id,
+        "sourceTransaction.reference": doc.plotNumber,
+        transactionType: "Sale",
+      });
+
+      if (!existingSaleEntry && doc.createdBy) {
+        // Create journal entry for sale
+        await AccountingService.createPlotSaleJournalEntry(doc, doc.createdBy);
+
+        // Update customer balance if not already updated during booking
+        if (doc.customer) {
+          const customer = await Customer.findById(doc.customer);
+          if (customer) {
+            const totalAmount =
+              doc.finalPrice || doc.grossAmount || doc.basePrice || 0;
+            const balanceDue = totalAmount - (doc.amountReceived || 0);
+
+            // Only update if not already accounted for
+            await Customer.findByIdAndUpdate(doc.customer, {
+              $inc: {
+                totalPurchase: totalAmount,
+                balance: balanceDue,
+              },
+            });
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error(
+      "Error creating journal entry or updating customer for plot:",
+      error.message
+    );
+    // Don't throw error to prevent plot update failure
   }
 });
 

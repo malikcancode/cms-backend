@@ -512,18 +512,29 @@ class AccountingService {
 
   /**
    * Helper method to get or create a chart of account
+   * Handles both main accounts and sub-accounts
    */
   static async getOrCreateAccount(code, name, type) {
+    // First try to find as a main account
     let account = await ChartOfAccount.findOne({ code: code });
 
     if (!account) {
-      // Create a basic account structure
-      // In a real system, you'd want to have proper account type setup
+      // Try to find as a sub-account or list account
+      const parentAccount = await ChartOfAccount.findOne({
+        $or: [{ "subAccounts.code": code }, { "listAccounts.code": code }],
+      });
+
+      if (parentAccount) {
+        // Return the parent account - it contains the sub-account
+        return parentAccount;
+      }
+
+      // If still not found, create a new account
       account = await ChartOfAccount.create({
         code: code,
         name: name,
         accountType: type,
-        mainAccountType: null, // You might want to link to AccountType
+        mainAccountType: null,
         mainTypeCode: code,
         mainAccountTypeText: name,
         financialComponent: this.getFinancialComponent(type),
@@ -830,82 +841,152 @@ class AccountingService {
   }
 
   /**
-   * Create journal entry for a plot sale
-   * This follows the standard format:
-   * Debit: Accounts Receivable (full amount)
-   * Debit: Cash Account (amount received)
-   * Credit: Property Sales Revenue (total of debits)
+   * Create journal entry for a plot booking
+   * Proper double-entry format:
+   * Debit: Cash Account (booking amount received)
+   * Debit: Accounts Receivable - Customer (balance due)
+   * Credit: Property Sales Revenue (total amount)
    */
-  static async createPlotSaleJournalEntry(plot, userId) {
+  static async createPlotBookingJournalEntry(plot, userId) {
     const revenueAccount = await this.getOrCreateAccount(
       "4001",
       "Property Sales Revenue",
       "Revenue"
     );
     const receivableAccount = await this.getOrCreateAccount(
-      "1003",
+      "1200",
       "Accounts Receivable",
       "Asset"
     );
     const cashAccount = await this.getOrCreateAccount(
-      "1001",
+      "1000",
       "Cash Account",
       "Asset"
     );
 
     const lines = [];
-    const finalPrice = plot.finalPrice || plot.grossAmount || plot.basePrice;
-
-    // Debit: Accounts Receivable (full amount)
-    lines.push({
-      account: receivableAccount._id,
-      accountCode: receivableAccount.code || "1003",
-      accountName: receivableAccount.name || "Accounts Receivable",
-      accountType: "Asset",
-      debit: finalPrice,
-      credit: 0,
-      description: `Plot sale receivable for ${plot.plotNumber}`,
-    });
+    const totalAmount =
+      plot.finalPrice || plot.grossAmount || plot.basePrice || 0;
+    const amountReceived = plot.amountReceived || plot.bookingAmount || 0;
+    const balanceDue = totalAmount - amountReceived;
 
     // Debit: Cash Account (amount received)
-    if (plot.amountReceived > 0) {
+    if (amountReceived > 0) {
       lines.push({
         account: cashAccount._id,
-        accountCode: cashAccount.code || "1001",
+        accountCode: cashAccount.code || "1000",
         accountName: cashAccount.name || "Cash Account",
         accountType: "Asset",
-        debit: plot.amountReceived,
+        debit: amountReceived,
         credit: 0,
-        description: `Cash received for plot ${plot.plotNumber}`,
+        description: `Booking amount received for plot ${plot.plotNumber}`,
       });
     }
 
-    // Credit: Property Sales Revenue (total = receivable + cash)
-    const totalCredit = finalPrice + (plot.amountReceived || 0);
+    // Debit: Accounts Receivable (balance due)
+    if (balanceDue > 0) {
+      lines.push({
+        account: receivableAccount._id,
+        accountCode: receivableAccount.code || "1200",
+        accountName: receivableAccount.name || "Accounts Receivable",
+        accountType: "Asset",
+        debit: balanceDue,
+        credit: 0,
+        description: `Balance due from customer for plot ${plot.plotNumber}`,
+      });
+    }
+
+    // Credit: Property Sales Revenue (total amount)
     lines.push({
       account: revenueAccount._id,
       accountCode: revenueAccount.code || "4001",
       accountName: revenueAccount.name || "Property Sales Revenue",
       accountType: "Revenue",
       debit: 0,
-      credit: totalCredit,
-      description: `Sale of plot ${plot.plotNumber}`,
+      credit: totalAmount,
+      description: `Plot booking revenue for ${plot.plotNumber}`,
     });
 
     const entryData = {
-      date: plot.saleDate || new Date(),
-      transactionType: "Sale",
+      date: plot.bookingDate || new Date(),
+      transactionType: "Booking",
       sourceTransaction: {
         model: "Plot",
         id: plot._id,
         reference: plot.plotNumber,
       },
       project: plot.project,
-      description: `Plot Sale ${plot.plotNumber}`,
+      description: `Plot Booking ${plot.plotNumber}${
+        plot.customer ? ` - Customer linked` : ""
+      }`,
       lines: lines,
     };
 
     return await this.createJournalEntry(entryData, userId);
+  }
+
+  /**
+   * Create journal entry for a plot sale
+   * This follows the standard format:
+   * Debit: Cash Account (if additional payment received)
+   * Credit: Accounts Receivable (if reducing balance)
+   */
+  static async createPlotSaleJournalEntry(plot, userId) {
+    const receivableAccount = await this.getOrCreateAccount(
+      "1200",
+      "Accounts Receivable",
+      "Asset"
+    );
+    const cashAccount = await this.getOrCreateAccount(
+      "1000",
+      "Cash Account",
+      "Asset"
+    );
+
+    const lines = [];
+    const amountReceived = plot.amountReceived || 0;
+
+    // Only create entry if there's additional payment beyond booking
+    if (amountReceived > 0) {
+      // Debit: Cash Account
+      lines.push({
+        account: cashAccount._id,
+        accountCode: cashAccount.code || "1000",
+        accountName: cashAccount.name || "Cash Account",
+        accountType: "Asset",
+        debit: amountReceived,
+        credit: 0,
+        description: `Payment received for plot ${plot.plotNumber}`,
+      });
+
+      // Credit: Accounts Receivable
+      lines.push({
+        account: receivableAccount._id,
+        accountCode: receivableAccount.code || "1200",
+        accountName: receivableAccount.name || "Accounts Receivable",
+        accountType: "Asset",
+        debit: 0,
+        credit: amountReceived,
+        description: `Payment against plot ${plot.plotNumber}`,
+      });
+
+      const entryData = {
+        date: plot.saleDate || new Date(),
+        transactionType: "Sale",
+        sourceTransaction: {
+          model: "Plot",
+          id: plot._id,
+          reference: plot.plotNumber,
+        },
+        project: plot.project,
+        description: `Plot Sale Payment ${plot.plotNumber}`,
+        lines: lines,
+      };
+
+      return await this.createJournalEntry(entryData, userId);
+    }
+
+    return null;
   }
 
   /**

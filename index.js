@@ -2,7 +2,6 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 const ensureDbConnection = require("./middleware/dbConnection");
 
@@ -57,32 +56,6 @@ app.use(
     hidePoweredBy: true,
   })
 );
-
-// Rate limiting to prevent brute force attacks
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: "Too many requests from this IP, please try again later.",
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => req.method === "OPTIONS", // Skip rate limiting for OPTIONS requests
-});
-
-// Apply rate limiting to all routes
-app.use(limiter);
-
-// Stricter rate limiting for authentication routes
-const authLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 5, // Limit each IP to 5 login attempts per windowMs
-  message: "Too many login attempts, please try again after 15 minutes.",
-  skipSuccessfulRequests: true,
-  skip: (req) => req.method === "OPTIONS", // Skip rate limiting for OPTIONS requests
-});
-
-// Apply auth limiter to login routes
-app.use("/api/auth/login", authLimiter);
-app.use("/api/auth/register", authLimiter);
 
 // Body parser with size limits to prevent payload attacks
 app.use(express.json({ limit: "10mb" }));

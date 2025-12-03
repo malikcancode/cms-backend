@@ -56,6 +56,7 @@ const GeneralLedgerSchema = new mongoose.Schema(
         "Journal",
         "Opening Balance",
         "Adjustment",
+        "Booking",
       ],
     },
     project: {
@@ -86,6 +87,7 @@ const GeneralLedgerSchema = new mongoose.Schema(
           "Purchase",
           "BankPayment",
           "CashPayment",
+          "Plot",
           "Manual",
         ],
       },

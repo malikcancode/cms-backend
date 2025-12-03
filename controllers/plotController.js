@@ -10,7 +10,7 @@ exports.getAllPlots = async (req, res) => {
     const query = req.sanitizedQuery || req.query;
     const { project, status } = query;
 
-    const filter = {};
+    const filter = { isActive: true };
     if (project) filter.project = project;
     if (status) filter.status = status;
 
@@ -193,6 +193,11 @@ exports.updatePlot = async (req, res) => {
       remarks,
     } = req.body;
 
+    // Track if customer or status is changing
+    const isStatusChanging = status !== undefined && plot.status !== status;
+    const isCustomerChanging =
+      customer !== undefined && plot.customer?.toString() !== customer;
+
     // Update fields
     if (plotNumber !== undefined) plot.plotNumber = plotNumber;
     if (block !== undefined) plot.block = block;
@@ -214,6 +219,14 @@ exports.updatePlot = async (req, res) => {
     if (possessionDate !== undefined) plot.possessionDate = possessionDate;
     if (features !== undefined) plot.features = features;
     if (remarks !== undefined) plot.remarks = remarks;
+
+    // Set createdBy for journal entry creation if booking/selling
+    if (
+      (isStatusChanging && (status === "Booked" || status === "Sold")) ||
+      isCustomerChanging
+    ) {
+      plot.createdBy = req.user._id;
+    }
 
     await plot.save();
 
@@ -303,7 +316,7 @@ exports.getPlotsByProject = async (req, res) => {
 exports.getPlotSummary = async (req, res) => {
   try {
     const { project } = req.query;
-    const filter = {};
+    const filter = { isActive: true };
     if (project) filter.project = project;
 
     const plots = await Plot.find(filter);

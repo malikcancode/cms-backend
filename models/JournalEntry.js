@@ -63,6 +63,7 @@ const JournalEntrySchema = new mongoose.Schema(
         "Journal",
         "Opening Balance",
         "Adjustment",
+        "Booking",
       ],
     },
     // Reference to the source transaction
@@ -74,6 +75,7 @@ const JournalEntrySchema = new mongoose.Schema(
           "Purchase",
           "BankPayment",
           "CashPayment",
+          "Plot",
           "Manual",
         ],
       },
