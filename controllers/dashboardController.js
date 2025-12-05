@@ -349,8 +349,8 @@ const getInventoryStats = async (req, res) => {
 // @access  Private
 const getExpenseBreakdown = async (req, res) => {
   try {
-    // Get all purchases
-    const purchases = await Purchase.find().populate("items.item");
+    // Get all purchases (without populate to avoid errors if items don't exist)
+    const purchases = await Purchase.find();
 
     // Get all bank payments with account details
     const bankPayments = await BankPayment.find({ cancel: false });

@@ -220,6 +220,7 @@ const generalLedgerRoutes = require("./routes/generalLedgerRoutes");
 const cashPaymentRoutes = require("./routes/cashPaymentRoutes");
 const plotRoutes = require("./routes/plotRoutes");
 const requestApprovalRoutes = require("./routes/requestApprovalRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -239,6 +240,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/journal-entries", journalEntryRoutes);
 app.use("/api/general-ledger", generalLedgerRoutes);
 app.use("/api/request-approvals", requestApprovalRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Root route
 app.get("/", (req, res) => {

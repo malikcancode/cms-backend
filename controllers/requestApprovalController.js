@@ -8,6 +8,7 @@ const Purchase = require("../models/Purchase");
 const Plot = require("../models/Plot");
 const Customer = require("../models/Customer");
 const Supplier = require("../models/Supplier");
+const { notifyAdmins } = require("./notificationController");
 
 // @desc    Create a new request for any entity creation/editing
 // @route   POST /api/request-approvals
@@ -125,6 +126,45 @@ exports.createRequest = async (req, res) => {
     if (requestType === "edit_project") {
       await request.populate("projectId", "name code");
     }
+
+    // Send notification to all admins
+    const requestTypeLabels = {
+      create_project: "Project Creation",
+      edit_project: "Project Update",
+      create_sales_invoice: "Sales Invoice Creation",
+      edit_sales_invoice: "Sales Invoice Update",
+      create_cash_payment: "Cash Payment",
+      edit_cash_payment: "Cash Payment Update",
+      create_bank_payment: "Bank Payment",
+      edit_bank_payment: "Bank Payment Update",
+      create_purchase: "Purchase Entry",
+      edit_purchase: "Purchase Entry Update",
+      create_plot: "Plot Creation",
+      edit_plot: "Plot Update",
+      create_customer: "Customer Creation",
+      edit_customer: "Customer Update",
+      create_supplier: "Supplier Creation",
+      edit_supplier: "Supplier Update",
+      create_user: "User Creation",
+      edit_user: "User Update",
+    };
+
+    await notifyAdmins({
+      sender: req.user.id,
+      type: "request_created",
+      title: `New ${requestTypeLabels[requestType]} Request`,
+      message: `${
+        request.userId.name
+      } has submitted a request for ${requestTypeLabels[
+        requestType
+      ].toLowerCase()}`,
+      entityType: "request_approval",
+      entityId: request._id,
+      metadata: {
+        requestType,
+        requestId: request._id,
+      },
+    });
 
     res.status(201).json({
       success: true,
@@ -261,8 +301,12 @@ exports.approveRequest = async (req, res) => {
     const requestTypeHandlers = {
       // Project handlers
       create_project: async () => {
+        const projectData = { ...request.requestData };
+
+        // No ObjectId references in Project model that need cleaning
+
         entity = await Project.create({
-          ...request.requestData,
+          ...projectData,
           createdBy: request.userId._id,
         });
         await entity.populate("createdBy", "name email role");
@@ -270,78 +314,182 @@ exports.approveRequest = async (req, res) => {
       edit_project: async () => {
         entity = await Project.findById(entityId);
         if (!entity) throw new Error("Project not found");
-        Object.assign(entity, request.requestData);
+
+        const projectData = { ...request.requestData };
+
+        Object.assign(entity, projectData);
         await entity.save();
         await entity.populate("createdBy", "name email role");
       },
 
       // Sales Invoice handlers
       create_sales_invoice: async () => {
+        const invoiceData = { ...request.requestData };
+
+        // Clean up empty string references
+        if (invoiceData.customer === "") invoiceData.customer = undefined;
+        if (invoiceData.project === "") invoiceData.project = undefined;
+
         entity = await SalesInvoice.create({
-          ...request.requestData,
+          ...invoiceData,
           createdBy: request.userId._id,
         });
       },
       edit_sales_invoice: async () => {
         entity = await SalesInvoice.findById(entityId);
         if (!entity) throw new Error("Sales Invoice not found");
-        Object.assign(entity, request.requestData);
+
+        const invoiceData = { ...request.requestData };
+
+        // Clean up empty string references
+        if (invoiceData.customer === "") invoiceData.customer = undefined;
+        if (invoiceData.project === "") invoiceData.project = undefined;
+
+        Object.assign(entity, invoiceData);
         await entity.save();
       },
 
       // Cash Payment handlers
       create_cash_payment: async () => {
+        const paymentData = { ...request.requestData };
+
+        // Clean up empty string references
+        if (paymentData.project === "") paymentData.project = undefined;
+        if (paymentData.employeeRef === "") paymentData.employeeRef = undefined;
+
+        // Calculate total amount from payment lines if not provided
+        if (!paymentData.totalAmount && paymentData.paymentLines) {
+          paymentData.totalAmount = paymentData.paymentLines.reduce(
+            (sum, line) => sum + (parseFloat(line.amount) || 0),
+            0
+          );
+        }
+
         entity = await CashPayment.create({
-          ...request.requestData,
+          ...paymentData,
           createdBy: request.userId._id,
         });
       },
       edit_cash_payment: async () => {
         entity = await CashPayment.findById(entityId);
         if (!entity) throw new Error("Cash Payment not found");
-        Object.assign(entity, request.requestData);
+
+        const paymentData = { ...request.requestData };
+
+        // Clean up empty string references
+        if (paymentData.project === "") paymentData.project = undefined;
+        if (paymentData.employeeRef === "") paymentData.employeeRef = undefined;
+
+        // Calculate total amount from payment lines if not provided
+        if (!paymentData.totalAmount && paymentData.paymentLines) {
+          paymentData.totalAmount = paymentData.paymentLines.reduce(
+            (sum, line) => sum + (parseFloat(line.amount) || 0),
+            0
+          );
+        }
+
+        Object.assign(entity, paymentData);
         await entity.save();
       },
 
       // Bank Payment handlers
       create_bank_payment: async () => {
+        const paymentData = { ...request.requestData };
+
+        // Clean up empty string references
+        if (paymentData.project === "") paymentData.project = undefined;
+        if (paymentData.employeeRef === "") paymentData.employeeRef = undefined;
+
+        // Calculate total amount from payment lines if not provided
+        if (!paymentData.totalAmount && paymentData.paymentLines) {
+          paymentData.totalAmount = paymentData.paymentLines.reduce(
+            (sum, line) => sum + (parseFloat(line.amount) || 0),
+            0
+          );
+        }
+
         entity = await BankPayment.create({
-          ...request.requestData,
+          ...paymentData,
           createdBy: request.userId._id,
         });
       },
       edit_bank_payment: async () => {
         entity = await BankPayment.findById(entityId);
         if (!entity) throw new Error("Bank Payment not found");
-        Object.assign(entity, request.requestData);
+
+        const paymentData = { ...request.requestData };
+
+        // Clean up empty string references
+        if (paymentData.project === "") paymentData.project = undefined;
+        if (paymentData.employeeRef === "") paymentData.employeeRef = undefined;
+
+        // Calculate total amount from payment lines if not provided
+        if (!paymentData.totalAmount && paymentData.paymentLines) {
+          paymentData.totalAmount = paymentData.paymentLines.reduce(
+            (sum, line) => sum + (parseFloat(line.amount) || 0),
+            0
+          );
+        }
+
+        Object.assign(entity, paymentData);
         await entity.save();
       },
 
       // Purchase handlers
       create_purchase: async () => {
+        const purchaseData = { ...request.requestData };
+
+        // Clean up empty string references
+        if (purchaseData.project === "") purchaseData.project = undefined;
+        if (purchaseData.employeeReference === "")
+          purchaseData.employeeReference = undefined;
+        if (purchaseData.item === "") purchaseData.item = undefined;
+
         entity = await Purchase.create({
-          ...request.requestData,
+          ...purchaseData,
           createdBy: request.userId._id,
         });
       },
       edit_purchase: async () => {
         entity = await Purchase.findById(entityId);
         if (!entity) throw new Error("Purchase not found");
-        Object.assign(entity, request.requestData);
+
+        const purchaseData = { ...request.requestData };
+
+        // Clean up empty string references
+        if (purchaseData.project === "") purchaseData.project = undefined;
+        if (purchaseData.employeeReference === "")
+          purchaseData.employeeReference = undefined;
+        if (purchaseData.item === "") purchaseData.item = undefined;
+
+        Object.assign(entity, purchaseData);
         await entity.save();
       },
 
       // Plot handlers
       create_plot: async () => {
+        const plotData = { ...request.requestData };
+
+        // Clean up empty string references
+        if (plotData.project === "") plotData.project = undefined;
+        if (plotData.customer === "") plotData.customer = undefined;
+
         entity = await Plot.create({
-          ...request.requestData,
+          ...plotData,
           createdBy: request.userId._id,
         });
       },
       edit_plot: async () => {
         entity = await Plot.findById(entityId);
         if (!entity) throw new Error("Plot not found");
-        Object.assign(entity, request.requestData);
+
+        const plotData = { ...request.requestData };
+
+        // Clean up empty string references
+        if (plotData.project === "") plotData.project = undefined;
+        if (plotData.customer === "") plotData.customer = undefined;
+
+        Object.assign(entity, plotData);
         await entity.save();
       },
 
@@ -401,6 +549,46 @@ exports.approveRequest = async (req, res) => {
     if (request.projectId) {
       await request.populate("projectId", "name code");
     }
+
+    // Send notification to the requester
+    const requestTypeLabels = {
+      create_project: "Project Creation",
+      edit_project: "Project Update",
+      create_sales_invoice: "Sales Invoice Creation",
+      edit_sales_invoice: "Sales Invoice Update",
+      create_cash_payment: "Cash Payment",
+      edit_cash_payment: "Cash Payment Update",
+      create_bank_payment: "Bank Payment",
+      edit_bank_payment: "Bank Payment Update",
+      create_purchase: "Purchase Entry",
+      edit_purchase: "Purchase Entry Update",
+      create_plot: "Plot Creation",
+      edit_plot: "Plot Update",
+      create_customer: "Customer Creation",
+      edit_customer: "Customer Update",
+      create_supplier: "Supplier Creation",
+      edit_supplier: "Supplier Update",
+      create_user: "User Creation",
+      edit_user: "User Update",
+    };
+
+    const Notification = require("../models/Notification");
+    await Notification.create({
+      recipient: request.userId._id,
+      sender: req.user.id,
+      type: "request_approved",
+      title: `Request Approved: ${requestTypeLabels[request.requestType]}`,
+      message: `Your request for ${requestTypeLabels[
+        request.requestType
+      ].toLowerCase()} has been approved by ${request.approvedBy.name}`,
+      entityType: "request_approval",
+      entityId: request._id,
+      metadata: {
+        requestType: request.requestType,
+        requestId: request._id,
+        adminResponse: request.adminResponse,
+      },
+    });
 
     res.status(200).json({
       success: true,
@@ -464,6 +652,48 @@ exports.rejectRequest = async (req, res) => {
     await request.save();
 
     await request.populate("approvedBy", "name email");
+
+    // Send notification to the requester
+    const requestTypeLabels = {
+      create_project: "Project Creation",
+      edit_project: "Project Update",
+      create_sales_invoice: "Sales Invoice Creation",
+      edit_sales_invoice: "Sales Invoice Update",
+      create_cash_payment: "Cash Payment",
+      edit_cash_payment: "Cash Payment Update",
+      create_bank_payment: "Bank Payment",
+      edit_bank_payment: "Bank Payment Update",
+      create_purchase: "Purchase Entry",
+      edit_purchase: "Purchase Entry Update",
+      create_plot: "Plot Creation",
+      edit_plot: "Plot Update",
+      create_customer: "Customer Creation",
+      edit_customer: "Customer Update",
+      create_supplier: "Supplier Creation",
+      edit_supplier: "Supplier Update",
+      create_user: "User Creation",
+      edit_user: "User Update",
+    };
+
+    const Notification = require("../models/Notification");
+    await Notification.create({
+      recipient: request.userId._id,
+      sender: req.user.id,
+      type: "request_rejected",
+      title: `Request Rejected: ${requestTypeLabels[request.requestType]}`,
+      message: `Your request for ${requestTypeLabels[
+        request.requestType
+      ].toLowerCase()} has been rejected by ${
+        request.approvedBy.name
+      }. Reason: ${adminResponse}`,
+      entityType: "request_approval",
+      entityId: request._id,
+      metadata: {
+        requestType: request.requestType,
+        requestId: request._id,
+        adminResponse: adminResponse,
+      },
+    });
 
     res.status(200).json({
       success: true,
