@@ -219,6 +219,7 @@ const journalEntryRoutes = require("./routes/journalEntryRoutes");
 const generalLedgerRoutes = require("./routes/generalLedgerRoutes");
 const cashPaymentRoutes = require("./routes/cashPaymentRoutes");
 const plotRoutes = require("./routes/plotRoutes");
+const requestApprovalRoutes = require("./routes/requestApprovalRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -237,6 +238,7 @@ app.use("/api/account-types", accountTypeRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/journal-entries", journalEntryRoutes);
 app.use("/api/general-ledger", generalLedgerRoutes);
+app.use("/api/request-approvals", requestApprovalRoutes);
 
 // Root route
 app.get("/", (req, res) => {
@@ -276,6 +278,7 @@ app.get("/api", (req, res) => {
       reports: "/api/reports",
       journalEntries: "/api/journal-entries",
       generalLedger: "/api/general-ledger",
+      requestApprovals: "/api/request-approvals",
     },
   });
 });

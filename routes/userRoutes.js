@@ -10,13 +10,13 @@ const {
 } = require("../controllers/userController");
 const { protect, admin } = require("../middleware/authMiddleware");
 
-// All routes are protected and require admin role
+// @route   GET /api/users
+// @desc    Get all users (for dropdowns - all authenticated users can access)
+router.get("/", protect, getAllUsers);
+
+// Admin-only routes
 router.use(protect);
 router.use(admin);
-
-// @route   GET /api/users
-// @desc    Get all users
-router.get("/", getAllUsers);
 
 // @route   GET /api/users/:id
 // @desc    Get single user by ID
