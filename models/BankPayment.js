@@ -62,6 +62,7 @@ const BankPaymentSchema = new mongoose.Schema(
         "Standard Chartered",
         "Faysal Bank",
         "Bank Alfalah",
+        "Al Makramah Bank",
       ],
     },
     bankAccountNumber: {

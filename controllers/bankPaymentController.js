@@ -269,6 +269,7 @@ const getBankEnum = async (req, res) => {
       },
       { value: "Faysal Bank", label: "Faysal Bank", code: "FBL" },
       { value: "Bank Alfalah", label: "Bank Alfalah", code: "BAFL" },
+      { value: "Al Makramah Bank", label: "Al Makramah Bank", code: "AMB" },
     ];
 
     res.status(200).json({
