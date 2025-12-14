@@ -5,13 +5,11 @@ const itemSchema = new mongoose.Schema(
     // Inventory Category
     categoryCode: {
       type: String,
-      required: [true, "Category code is required"],
       trim: true,
       uppercase: true,
     },
     categoryName: {
       type: String,
-      required: [true, "Category name is required"],
       trim: true,
     },
 

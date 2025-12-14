@@ -5,6 +5,7 @@ const Project = require("../models/Project");
 // @access  Private
 exports.createProject = async (req, res) => {
   try {
+    // Map frontend field names to backend field names
     const {
       name,
       client,
@@ -12,20 +13,33 @@ exports.createProject = async (req, res) => {
       address,
       code,
       contact,
+      projectNo,
       jobNo,
+      projectDescription,
       jobDescription,
       orderNo,
       orderDate,
       expiryDate,
       deliveryDate,
+      valueOfProject,
       valueOfJob,
+      projectCompleted,
       jobCompleted,
       startDate,
       completionDate,
       estimatedCost,
+      projectIncharge,
       jobIncharge,
       status,
     } = req.body;
+
+    // Use frontend names if provided, otherwise fall back to backend names
+    const mappedJobNo = projectNo || jobNo;
+    const mappedJobDescription = projectDescription || jobDescription;
+    const mappedValueOfJob = valueOfProject || valueOfJob;
+    const mappedJobCompleted =
+      projectCompleted !== undefined ? projectCompleted : jobCompleted;
+    const mappedJobIncharge = projectIncharge || jobIncharge;
 
     // Validation
     if (
@@ -34,7 +48,7 @@ exports.createProject = async (req, res) => {
       !startDate ||
       !completionDate ||
       !estimatedCost ||
-      !jobIncharge
+      !mappedJobIncharge
     ) {
       return res.status(400).json({
         success: false,
@@ -68,19 +82,20 @@ exports.createProject = async (req, res) => {
       address,
       code,
       contact,
-      jobNo,
-      jobDescription,
+      jobNo: mappedJobNo,
+      jobDescription: mappedJobDescription,
       orderNo,
       orderDate,
       expiryDate,
       deliveryDate,
-      valueOfJob,
-      jobCompleted: jobCompleted || false,
+      valueOfJob: mappedValueOfJob,
+      jobCompleted: mappedJobCompleted || false,
       startDate,
       completionDate,
       estimatedCost,
-      jobIncharge,
-      status: status || "Active",
+      jobIncharge: mappedJobIncharge,
+      // Sync status with jobCompleted: if completed, status is "Completed", otherwise use provided status or "Active"
+      status: mappedJobCompleted ? "Completed" : status || "Active",
       createdBy: req.user.id,
     };
 
@@ -165,6 +180,7 @@ exports.getProjectById = async (req, res) => {
 // @access  Private
 exports.updateProject = async (req, res) => {
   try {
+    // Map frontend field names to backend field names
     const {
       name,
       client,
@@ -172,20 +188,33 @@ exports.updateProject = async (req, res) => {
       address,
       code,
       contact,
+      projectNo,
       jobNo,
+      projectDescription,
       jobDescription,
       orderNo,
       orderDate,
       expiryDate,
       deliveryDate,
+      valueOfProject,
       valueOfJob,
+      projectCompleted,
       jobCompleted,
       startDate,
       completionDate,
       estimatedCost,
+      projectIncharge,
       jobIncharge,
       status,
     } = req.body;
+
+    // Use frontend names if provided, otherwise fall back to backend names
+    const mappedJobNo = projectNo || jobNo;
+    const mappedJobDescription = projectDescription || jobDescription;
+    const mappedValueOfJob = valueOfProject || valueOfJob;
+    const mappedJobCompleted =
+      projectCompleted !== undefined ? projectCompleted : jobCompleted;
+    const mappedJobIncharge = projectIncharge || jobIncharge;
 
     const project = await Project.findById(req.params.id);
 
@@ -222,19 +251,32 @@ exports.updateProject = async (req, res) => {
     if (address !== undefined) project.address = address;
     if (code !== undefined) project.code = code;
     if (contact !== undefined) project.contact = contact;
-    if (jobNo !== undefined) project.jobNo = jobNo;
-    if (jobDescription !== undefined) project.jobDescription = jobDescription;
+    if (mappedJobNo !== undefined) project.jobNo = mappedJobNo;
+    if (mappedJobDescription !== undefined)
+      project.jobDescription = mappedJobDescription;
     if (orderNo !== undefined) project.orderNo = orderNo;
     if (orderDate !== undefined) project.orderDate = orderDate;
     if (expiryDate !== undefined) project.expiryDate = expiryDate;
     if (deliveryDate !== undefined) project.deliveryDate = deliveryDate;
-    if (valueOfJob !== undefined) project.valueOfJob = valueOfJob;
-    if (jobCompleted !== undefined) project.jobCompleted = jobCompleted;
+    if (mappedValueOfJob !== undefined) project.valueOfJob = mappedValueOfJob;
+    if (mappedJobCompleted !== undefined) {
+      project.jobCompleted = mappedJobCompleted;
+      // Automatically sync status with jobCompleted
+      if (mappedJobCompleted === true) {
+        project.status = "Completed";
+      } else if (project.status === "Completed") {
+        // If unchecking completed, revert to Active
+        project.status = "Active";
+      }
+    }
     if (startDate !== undefined) project.startDate = startDate;
     if (completionDate !== undefined) project.completionDate = completionDate;
     if (estimatedCost !== undefined) project.estimatedCost = estimatedCost;
-    if (jobIncharge !== undefined) project.jobIncharge = jobIncharge;
-    if (status !== undefined) project.status = status;
+    if (mappedJobIncharge !== undefined)
+      project.jobIncharge = mappedJobIncharge;
+    // Allow manual status override only if jobCompleted is not being changed
+    if (status !== undefined && mappedJobCompleted === undefined)
+      project.status = status;
 
     await project.save();
 

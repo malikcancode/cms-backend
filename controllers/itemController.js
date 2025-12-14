@@ -74,11 +74,11 @@ exports.createItem = async (req, res) => {
     } = req.body;
 
     // Validation
-    if (!categoryCode || !categoryName || !itemCode || !name || !measurement) {
+    if (!itemCode || !name || !measurement) {
       return res.status(400).json({
         success: false,
         message:
-          "Please provide all required fields: categoryCode, categoryName, itemCode, name, and measurement",
+          "Please provide all required fields: itemCode, name, and measurement",
       });
     }
 

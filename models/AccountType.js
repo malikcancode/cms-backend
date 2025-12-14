@@ -18,16 +18,7 @@ const accountTypeSchema = new mongoose.Schema(
     financialComponent: {
       type: String,
       required: [true, "Financial component is required"],
-      enum: [
-        "Operating Expenses",
-        "Operating Income",
-        "Direct Costs",
-        "Assets",
-        "Liabilities",
-        "Equity",
-        "EXPENSE ACCOUNTS",
-        "REVENUE ACCOUNTS",
-      ],
+      enum: ["salary", "pay roll", "pr expenses", "miscellaneous expenses"],
     },
     description: {
       type: String,
