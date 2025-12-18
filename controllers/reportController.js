@@ -11,7 +11,7 @@ const getIncomeStatement = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     // Build date filter
-    const dateFilter = {};
+    const dateFilter = { tenantId: req.tenantId };
     if (startDate || endDate) {
       dateFilter.date = {};
       if (startDate) dateFilter.date.$gte = new Date(startDate);
@@ -546,7 +546,10 @@ const recordPaymentReceipt = async (req, res) => {
 
     // If invoice reference provided, update the invoice
     if (invoiceRef) {
-      const invoice = await SalesInvoice.findOne({ serialNo: invoiceRef });
+      const invoice = await SalesInvoice.findOne({
+        tenantId: req.tenantId,
+        serialNo: invoiceRef,
+      });
       if (invoice) {
         invoice.amountReceived += amount;
         invoice.balance = invoice.netTotal - invoice.amountReceived;
@@ -634,7 +637,10 @@ const recordSupplierPayment = async (req, res) => {
     const Purchase = require("../models/Purchase");
 
     // Verify supplier exists
-    const supplier = await Supplier.findOne({ code: supplierCode });
+    const supplier = await Supplier.findOne({
+      tenantId: req.tenantId,
+      code: supplierCode,
+    });
     if (!supplier) {
       return res.status(404).json({
         success: false,
@@ -644,7 +650,10 @@ const recordSupplierPayment = async (req, res) => {
 
     // If purchase reference provided, update the purchase
     if (purchaseRef) {
-      const purchase = await Purchase.findOne({ purchaseOrderNo: purchaseRef });
+      const purchase = await Purchase.findOne({
+        tenantId: req.tenantId,
+        purchaseOrderNo: purchaseRef,
+      });
       if (purchase) {
         purchase.amountPaid = (purchase.amountPaid || 0) + amount;
 
@@ -723,7 +732,7 @@ const getPlotsReport = async (req, res) => {
     }
 
     // Get all plots matching filter
-    const plots = await Plot.find(filter)
+    const plots = await Plot.find({ tenantId: req.tenantId, ...filter })
       .populate("project", "name code location")
       .populate("customer", "name code email phone address")
       .populate("createdBy", "name email")

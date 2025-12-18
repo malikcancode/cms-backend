@@ -24,9 +24,12 @@ const CashPaymentLineSchema = new mongoose.Schema({
 
 const CashPaymentSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     serialNo: {
       type: String,
-      unique: true,
       trim: true,
     },
     cancel: {
@@ -117,7 +120,10 @@ CashPaymentSchema.post("save", async function (doc) {
     }
   }
 });
-
+// Indexes for tenant isolation and queries
+CashPaymentSchema.index({ tenantId: 1 });
+CashPaymentSchema.index({ tenantId: 1, serialNo: 1 });
+CashPaymentSchema.index({ tenantId: 1, date: -1 });
 const CashPayment = mongoose.model("CashPayment", CashPaymentSchema);
 
 module.exports = CashPayment;

@@ -11,7 +11,7 @@ const getGeneralLedger = async (req, res) => {
       queryParams;
 
     // Build query
-    const query = { status: "Active" };
+    const query = { tenantId: req.tenantId, status: "Active" };
     if (accountCode) query.accountCode = accountCode;
     if (accountType) query.accountType = accountType;
     if (project) query.project = project;
@@ -183,7 +183,7 @@ const getLedgerSummary = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
-    const query = { status: "Active" };
+    const query = { tenantId: req.tenantId, status: "Active" };
     if (startDate || endDate) {
       query.date = {};
       if (startDate) query.date.$gte = new Date(startDate);

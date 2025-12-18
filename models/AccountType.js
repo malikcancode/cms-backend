@@ -2,18 +2,20 @@ const mongoose = require("mongoose");
 
 const accountTypeSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     name: {
       type: String,
       required: [true, "Account type name is required"],
       trim: true,
-      unique: true,
     },
     code: {
       type: String,
       required: [true, "Account type code is required"],
       trim: true,
       uppercase: true,
-      unique: true,
     },
     financialComponent: {
       type: String,
@@ -39,6 +41,7 @@ const accountTypeSchema = new mongoose.Schema(
 );
 
 // Index for faster queries
-// Note: name and code already have unique indexes via unique: true
+accountTypeSchema.index({ tenantId: 1, name: 1 }, { unique: true });
+accountTypeSchema.index({ tenantId: 1, code: 1 }, { unique: true });
 
 module.exports = mongoose.model("AccountType", accountTypeSchema);

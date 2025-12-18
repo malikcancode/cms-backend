@@ -5,7 +5,8 @@ const ChartOfAccount = require("../models/ChartOfAccount");
 // @access  Private
 const getChartOfAccounts = async (req, res) => {
   try {
-    const accounts = await ChartOfAccount.find()
+    // Filter by tenantId - only show data for current tenant
+    const accounts = await ChartOfAccount.find({ tenantId: req.tenantId })
       .populate("createdBy", "name email")
       .populate("mainAccountType", "name code financialComponent")
       .sort({ createdAt: -1 });
@@ -30,7 +31,11 @@ const getChartOfAccounts = async (req, res) => {
 // @access  Private
 const getChartOfAccountById = async (req, res) => {
   try {
-    const account = await ChartOfAccount.findById(req.params.id)
+    // Filter by both ID and tenantId for security
+    const account = await ChartOfAccount.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    })
       .populate("createdBy", "name email")
       .populate("mainAccountType", "name code financialComponent");
 
@@ -82,8 +87,11 @@ const createChartOfAccount = async (req, res) => {
       });
     }
 
-    // Check for duplicate main type code
-    const existingAccount = await ChartOfAccount.findOne({ mainTypeCode });
+    // Check for duplicate main type code - only within same tenant
+    const existingAccount = await ChartOfAccount.findOne({
+      tenantId: req.tenantId,
+      mainTypeCode,
+    });
     if (existingAccount) {
       return res.status(400).json({
         success: false,
@@ -92,6 +100,7 @@ const createChartOfAccount = async (req, res) => {
     }
 
     const account = await ChartOfAccount.create({
+      tenantId: req.tenantId, // Automatically add tenantId
       mainAccountType,
       mainTypeCode,
       mainAccountTypeText,
@@ -133,7 +142,10 @@ const updateChartOfAccount = async (req, res) => {
       listAccounts,
     } = req.body;
 
-    let account = await ChartOfAccount.findById(req.params.id);
+    let account = await ChartOfAccount.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!account) {
       return res.status(404).json({
@@ -142,10 +154,13 @@ const updateChartOfAccount = async (req, res) => {
       });
     }
 
-    // Check if updating main type code and if it's already taken
+    // Check if updating main type code and if it's already taken - within same tenant
     if (mainTypeCode && mainTypeCode !== account.mainTypeCode) {
-      const existingAccount = await ChartOfAccount.findOne({ mainTypeCode });
-      if (existingAccount) {
+      const duplicate = await ChartOfAccount.findOne({
+        tenantId: req.tenantId,
+        mainTypeCode,
+      });
+      if (duplicate) {
         return res.status(400).json({
           success: false,
           message: "Account with this main type code already exists",
@@ -187,7 +202,10 @@ const updateChartOfAccount = async (req, res) => {
 // @access  Private
 const deleteChartOfAccount = async (req, res) => {
   try {
-    const account = await ChartOfAccount.findById(req.params.id);
+    const account = await ChartOfAccount.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!account) {
       return res.status(404).json({

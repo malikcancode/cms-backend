@@ -3,6 +3,10 @@ const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     name: {
       type: String,
       required: [true, "Name is required"],
@@ -11,7 +15,6 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: [true, "Email is required"],
-      unique: true,
       lowercase: true,
       trim: true,
       match: [
@@ -56,6 +59,9 @@ const userSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Ensure unique email per tenant
+userSchema.index({ tenantId: 1, email: 1 }, { unique: true });
 
 // Hash password before saving
 userSchema.pre("save", async function () {

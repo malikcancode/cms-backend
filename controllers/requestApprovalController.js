@@ -70,21 +70,27 @@ exports.createRequest = async (req, res) => {
       const id = entityId || projectId;
       let entity;
 
-      if (requestType === "edit_project") entity = await Project.findById(id);
+      if (requestType === "edit_project")
+        entity = await Project.findOne({ _id: id, tenantId: req.tenantId });
       else if (requestType === "edit_sales_invoice")
-        entity = await SalesInvoice.findById(id);
+        entity = await SalesInvoice.findOne({
+          _id: id,
+          tenantId: req.tenantId,
+        });
       else if (requestType === "edit_cash_payment")
-        entity = await CashPayment.findById(id);
+        entity = await CashPayment.findOne({ _id: id, tenantId: req.tenantId });
       else if (requestType === "edit_bank_payment")
-        entity = await BankPayment.findById(id);
+        entity = await BankPayment.findOne({ _id: id, tenantId: req.tenantId });
       else if (requestType === "edit_purchase")
-        entity = await Purchase.findById(id);
-      else if (requestType === "edit_plot") entity = await Plot.findById(id);
+        entity = await Purchase.findOne({ _id: id, tenantId: req.tenantId });
+      else if (requestType === "edit_plot")
+        entity = await Plot.findOne({ _id: id, tenantId: req.tenantId });
       else if (requestType === "edit_customer")
-        entity = await Customer.findById(id);
+        entity = await Customer.findOne({ _id: id, tenantId: req.tenantId });
       else if (requestType === "edit_supplier")
-        entity = await Supplier.findById(id);
-      else if (requestType === "edit_user") entity = await User.findById(id);
+        entity = await Supplier.findOne({ _id: id, tenantId: req.tenantId });
+      else if (requestType === "edit_user")
+        entity = await User.findOne({ _id: id, tenantId: req.tenantId });
 
       if (!entity) {
         return res.status(404).json({
@@ -98,6 +104,7 @@ exports.createRequest = async (req, res) => {
     if (isEditRequest) {
       const id = entityId || projectId;
       const existingRequest = await RequestApproval.findOne({
+        tenantId: req.tenantId,
         userId: req.user.id,
         $or: [{ entityId: id }, { projectId: id }],
         status: "pending",
@@ -113,6 +120,7 @@ exports.createRequest = async (req, res) => {
 
     // Create the request
     const request = await RequestApproval.create({
+      tenantId: req.tenantId,
       userId: req.user.id,
       requestType,
       requestData,
@@ -186,7 +194,10 @@ exports.createRequest = async (req, res) => {
 // @access  Private
 exports.getMyRequests = async (req, res) => {
   try {
-    const requests = await RequestApproval.find({ userId: req.user.id })
+    const requests = await RequestApproval.find({
+      tenantId: req.tenantId,
+      userId: req.user.id,
+    })
       .populate("userId", "name email role")
       .populate("projectId", "name code")
       .populate("approvedBy", "name email")
@@ -212,7 +223,10 @@ exports.getMyRequests = async (req, res) => {
 // @access  Private/Admin
 exports.getPendingRequests = async (req, res) => {
   try {
-    const requests = await RequestApproval.find({ status: "pending" })
+    const requests = await RequestApproval.find({
+      tenantId: req.tenantId,
+      status: "pending",
+    })
       .populate("userId", "name email role customPermissions")
       .populate("projectId", "name code")
       .sort({ createdAt: -1 });
@@ -238,7 +252,7 @@ exports.getPendingRequests = async (req, res) => {
 exports.getAllRequests = async (req, res) => {
   try {
     const { status } = req.query;
-    const filter = {};
+    const filter = { tenantId: req.tenantId };
 
     if (status) {
       filter.status = status;
@@ -274,10 +288,10 @@ exports.approveRequest = async (req, res) => {
     const { adminResponse } = req.body;
 
     // Find the request
-    const request = await RequestApproval.findById(id).populate(
-      "userId",
-      "name email role"
-    );
+    const request = await RequestApproval.findOne({
+      _id: id,
+      tenantId: req.tenantId,
+    }).populate("userId", "name email role");
 
     if (!request) {
       return res.status(404).json({
@@ -312,7 +326,10 @@ exports.approveRequest = async (req, res) => {
         await entity.populate("createdBy", "name email role");
       },
       edit_project: async () => {
-        entity = await Project.findById(entityId);
+        entity = await Project.findOne({
+          _id: entityId,
+          tenantId: req.tenantId,
+        });
         if (!entity) throw new Error("Project not found");
 
         const projectData = { ...request.requestData };
@@ -332,11 +349,15 @@ exports.approveRequest = async (req, res) => {
 
         entity = await SalesInvoice.create({
           ...invoiceData,
+          tenantId: req.tenantId,
           createdBy: request.userId._id,
         });
       },
       edit_sales_invoice: async () => {
-        entity = await SalesInvoice.findById(entityId);
+        entity = await SalesInvoice.findOne({
+          _id: entityId,
+          tenantId: req.tenantId,
+        });
         if (!entity) throw new Error("Sales Invoice not found");
 
         const invoiceData = { ...request.requestData };
@@ -367,11 +388,15 @@ exports.approveRequest = async (req, res) => {
 
         entity = await CashPayment.create({
           ...paymentData,
+          tenantId: req.tenantId,
           createdBy: request.userId._id,
         });
       },
       edit_cash_payment: async () => {
-        entity = await CashPayment.findById(entityId);
+        entity = await CashPayment.findOne({
+          _id: entityId,
+          tenantId: req.tenantId,
+        });
         if (!entity) throw new Error("Cash Payment not found");
 
         const paymentData = { ...request.requestData };
@@ -410,11 +435,15 @@ exports.approveRequest = async (req, res) => {
 
         entity = await BankPayment.create({
           ...paymentData,
+          tenantId: req.tenantId,
           createdBy: request.userId._id,
         });
       },
       edit_bank_payment: async () => {
-        entity = await BankPayment.findById(entityId);
+        entity = await BankPayment.findOne({
+          _id: entityId,
+          tenantId: req.tenantId,
+        });
         if (!entity) throw new Error("Bank Payment not found");
 
         const paymentData = { ...request.requestData };
@@ -447,11 +476,15 @@ exports.approveRequest = async (req, res) => {
 
         entity = await Purchase.create({
           ...purchaseData,
+          tenantId: req.tenantId,
           createdBy: request.userId._id,
         });
       },
       edit_purchase: async () => {
-        entity = await Purchase.findById(entityId);
+        entity = await Purchase.findOne({
+          _id: entityId,
+          tenantId: req.tenantId,
+        });
         if (!entity) throw new Error("Purchase not found");
 
         const purchaseData = { ...request.requestData };
@@ -476,11 +509,12 @@ exports.approveRequest = async (req, res) => {
 
         entity = await Plot.create({
           ...plotData,
+          tenantId: req.tenantId,
           createdBy: request.userId._id,
         });
       },
       edit_plot: async () => {
-        entity = await Plot.findById(entityId);
+        entity = await Plot.findOne({ _id: entityId, tenantId: req.tenantId });
         if (!entity) throw new Error("Plot not found");
 
         const plotData = { ...request.requestData };
@@ -495,10 +529,16 @@ exports.approveRequest = async (req, res) => {
 
       // Customer handlers
       create_customer: async () => {
-        entity = await Customer.create(request.requestData);
+        entity = await Customer.create({
+          ...request.requestData,
+          tenantId: req.tenantId,
+        });
       },
       edit_customer: async () => {
-        entity = await Customer.findById(entityId);
+        entity = await Customer.findOne({
+          _id: entityId,
+          tenantId: req.tenantId,
+        });
         if (!entity) throw new Error("Customer not found");
         Object.assign(entity, request.requestData);
         await entity.save();
@@ -506,10 +546,16 @@ exports.approveRequest = async (req, res) => {
 
       // Supplier handlers
       create_supplier: async () => {
-        entity = await Supplier.create(request.requestData);
+        entity = await Supplier.create({
+          ...request.requestData,
+          tenantId: req.tenantId,
+        });
       },
       edit_supplier: async () => {
-        entity = await Supplier.findById(entityId);
+        entity = await Supplier.findOne({
+          _id: entityId,
+          tenantId: req.tenantId,
+        });
         if (!entity) throw new Error("Supplier not found");
         Object.assign(entity, request.requestData);
         await entity.save();
@@ -517,10 +563,13 @@ exports.approveRequest = async (req, res) => {
 
       // User handlers
       create_user: async () => {
-        entity = await User.create(request.requestData);
+        entity = await User.create({
+          ...request.requestData,
+          tenantId: req.tenantId,
+        });
       },
       edit_user: async () => {
-        entity = await User.findById(entityId);
+        entity = await User.findOne({ _id: entityId, tenantId: req.tenantId });
         if (!entity) throw new Error("User not found");
         Object.assign(entity, request.requestData);
         await entity.save();
@@ -617,7 +666,10 @@ exports.rejectRequest = async (req, res) => {
     const { adminResponse } = req.body;
 
     // Find the request
-    const request = await RequestApproval.findById(id)
+    const request = await RequestApproval.findOne({
+      _id: id,
+      tenantId: req.tenantId,
+    })
       .populate("userId", "name email role")
       .populate("projectId", "name code");
 
@@ -717,7 +769,10 @@ exports.deleteRequest = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const request = await RequestApproval.findById(id);
+    const request = await RequestApproval.findOne({
+      _id: id,
+      tenantId: req.tenantId,
+    });
 
     if (!request) {
       return res.status(404).json({
@@ -759,6 +814,9 @@ exports.deleteRequest = async (req, res) => {
 exports.getRequestStats = async (req, res) => {
   try {
     const stats = await RequestApproval.aggregate([
+      {
+        $match: { tenantId: req.tenantId },
+      },
       {
         $group: {
           _id: "$status",

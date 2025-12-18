@@ -7,7 +7,7 @@ const User = require("../models/User");
 // @access  Private
 exports.getAllPurchases = async (req, res) => {
   try {
-    const purchases = await Purchase.find()
+    const purchases = await Purchase.find({ tenantId: req.tenantId })
       .populate("item", "name itemCode measurement")
       .populate("employeeReference", "name email")
       .populate("project", "name code")
@@ -33,7 +33,10 @@ exports.getAllPurchases = async (req, res) => {
 // @access  Private
 exports.getPurchaseById = async (req, res) => {
   try {
-    const purchase = await Purchase.findById(req.params.id)
+    const purchase = await Purchase.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    })
       .populate("item", "name itemCode measurement categoryName")
       .populate("employeeReference", "name email")
       .populate("project", "name code");
@@ -109,7 +112,10 @@ exports.createPurchase = async (req, res) => {
     }
 
     // Verify item exists
-    const itemExists = await Item.findById(item);
+    const itemExists = await Item.findOne({
+      _id: item,
+      tenantId: req.tenantId,
+    });
     if (!itemExists) {
       return res.status(404).json({
         success: false,
@@ -119,7 +125,10 @@ exports.createPurchase = async (req, res) => {
 
     // Verify employee reference if provided
     if (employeeReference) {
-      const userExists = await User.findById(employeeReference);
+      const userExists = await User.findOne({
+        _id: employeeReference,
+        tenantId: req.tenantId,
+      });
       if (!userExists) {
         return res.status(404).json({
           success: false,
@@ -130,6 +139,7 @@ exports.createPurchase = async (req, res) => {
 
     // Create purchase data
     const purchaseData = {
+      tenantId: req.tenantId,
       serialNo: serialNo.toUpperCase(),
       date,
       purchaseOrderNo,
@@ -200,7 +210,10 @@ exports.createPurchase = async (req, res) => {
 // @access  Private
 exports.updatePurchase = async (req, res) => {
   try {
-    const purchase = await Purchase.findById(req.params.id);
+    const purchase = await Purchase.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!purchase) {
       return res.status(404).json({
@@ -254,7 +267,10 @@ exports.updatePurchase = async (req, res) => {
 
     // Verify item if being updated
     if (item) {
-      const itemExists = await Item.findById(item);
+      const itemExists = await Item.findOne({
+        _id: item,
+        tenantId: req.tenantId,
+      });
       if (!itemExists) {
         return res.status(404).json({
           success: false,
@@ -313,7 +329,10 @@ exports.updatePurchase = async (req, res) => {
 // @access  Private
 exports.deletePurchase = async (req, res) => {
   try {
-    const purchase = await Purchase.findById(req.params.id);
+    const purchase = await Purchase.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!purchase) {
       return res.status(404).json({

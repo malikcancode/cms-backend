@@ -3,6 +3,10 @@ const mongoose = require("mongoose");
 // Schema for General Ledger entries
 const GeneralLedgerSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     account: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "ChartOfAccount",
@@ -12,7 +16,6 @@ const GeneralLedgerSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      index: true,
     },
     accountName: {
       type: String,
@@ -23,12 +26,10 @@ const GeneralLedgerSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: ["Asset", "Liability", "Equity", "Revenue", "Expense"],
-      index: true,
     },
     date: {
       type: Date,
       required: true,
-      index: true,
     },
     journalEntry: {
       type: mongoose.Schema.Types.ObjectId,
@@ -122,12 +123,12 @@ const GeneralLedgerSchema = new mongoose.Schema(
 );
 
 // Compound indexes for performance
-GeneralLedgerSchema.index({ accountCode: 1, date: 1 });
-GeneralLedgerSchema.index({ accountType: 1, date: 1 });
-GeneralLedgerSchema.index({ project: 1, date: 1 });
-GeneralLedgerSchema.index({ fiscalYear: 1, fiscalPeriod: 1 });
-GeneralLedgerSchema.index({ date: -1 });
-GeneralLedgerSchema.index({ journalEntry: 1 });
+GeneralLedgerSchema.index({ tenantId: 1, accountCode: 1, date: 1 });
+GeneralLedgerSchema.index({ tenantId: 1, accountType: 1, date: 1 });
+GeneralLedgerSchema.index({ tenantId: 1, project: 1, date: 1 });
+GeneralLedgerSchema.index({ tenantId: 1, fiscalYear: 1, fiscalPeriod: 1 });
+GeneralLedgerSchema.index({ tenantId: 1, date: -1 });
+GeneralLedgerSchema.index({ tenantId: 1, journalEntry: 1 });
 
 // Pre-save middleware to set fiscal year and period
 GeneralLedgerSchema.pre("save", function () {
@@ -441,6 +442,9 @@ GeneralLedgerSchema.statics.getProfitAndLoss = async function (
     netProfitMargin: totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0,
   };
 };
+
+// Indexes for efficient multi-tenant queries
+GeneralLedgerSchema.index({ tenantId: 1, accountCode: 1 });
 
 const GeneralLedger = mongoose.model("GeneralLedger", GeneralLedgerSchema);
 

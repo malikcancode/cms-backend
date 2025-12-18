@@ -15,28 +15,34 @@ const ChartOfAccount = require("../models/ChartOfAccount");
 const getDashboardStats = async (req, res) => {
   try {
     // Get all sales invoices
-    const salesInvoices = await SalesInvoice.find();
+    const salesInvoices = await SalesInvoice.find({ tenantId: req.tenantId });
     const totalSales = salesInvoices.reduce(
       (sum, invoice) => sum + (invoice.netTotal || 0),
       0
     );
 
     // Get all purchases and bank payments for total expenses
-    const purchases = await Purchase.find();
+    const purchases = await Purchase.find({ tenantId: req.tenantId });
     const purchaseExpenses = purchases.reduce(
       (sum, purchase) => sum + (purchase.netAmount || 0),
       0
     );
 
     // Get all bank payments (not cancelled)
-    const bankPayments = await BankPayment.find({ cancel: false });
+    const bankPayments = await BankPayment.find({
+      tenantId: req.tenantId,
+      cancel: false,
+    });
     const bankPaymentExpenses = bankPayments.reduce(
       (sum, payment) => sum + (payment.totalAmount || 0),
       0
     );
 
     // Get all cash payments (not cancelled)
-    const cashPayments = await CashPayment.find({ cancel: false });
+    const cashPayments = await CashPayment.find({
+      tenantId: req.tenantId,
+      cancel: false,
+    });
     const cashPaymentExpenses = cashPayments.reduce(
       (sum, payment) => sum + (payment.totalAmount || 0),
       0
@@ -51,6 +57,7 @@ const getDashboardStats = async (req, res) => {
 
     // Get active projects count
     const activeProjectsCount = await Project.countDocuments({
+      tenantId: req.tenantId,
       status: "Active",
     });
 
@@ -66,6 +73,7 @@ const getDashboardStats = async (req, res) => {
 
     // Last month's sales
     const lastMonthSales = await SalesInvoice.find({
+      tenantId: req.tenantId,
       date: { $gte: firstDayLastMonth, $lte: lastDayLastMonth },
     });
     const lastMonthSalesTotal = lastMonthSales.reduce(
@@ -75,6 +83,7 @@ const getDashboardStats = async (req, res) => {
 
     // Last month's purchases
     const lastMonthPurchases = await Purchase.find({
+      tenantId: req.tenantId,
       date: { $gte: firstDayLastMonth, $lte: lastDayLastMonth },
     });
     const lastMonthPurchaseExpenses = lastMonthPurchases.reduce(
@@ -84,6 +93,7 @@ const getDashboardStats = async (req, res) => {
 
     // Last month's bank payments
     const lastMonthBankPayments = await BankPayment.find({
+      tenantId: req.tenantId,
       cancel: false,
       date: { $gte: firstDayLastMonth, $lte: lastDayLastMonth },
     });
@@ -94,6 +104,7 @@ const getDashboardStats = async (req, res) => {
 
     // Last month's cash payments
     const lastMonthCashPayments = await CashPayment.find({
+      tenantId: req.tenantId,
       cancel: false,
       date: { $gte: firstDayLastMonth, $lte: lastDayLastMonth },
     });
@@ -121,8 +132,6 @@ const getDashboardStats = async (req, res) => {
     const expensesChange = calculateChange(totalExpenses, lastMonthExpenses);
     const salesChange = calculateChange(totalSales, lastMonthSalesTotal);
     const profitChange = calculateChange(netProfit, lastMonthProfit);
-
-    // Get last month's active projects count
     const lastMonthActiveProjects = await Project.countDocuments({
       status: "Active",
       createdAt: { $lt: firstDayThisMonth },
@@ -166,7 +175,7 @@ const getRecentProjects = async (req, res) => {
     const limit = parseInt(query.limit) || 5;
 
     // Get recent projects sorted by creation date
-    const projects = await Project.find()
+    const projects = await Project.find({ tenantId: req.tenantId })
       .sort({ createdAt: -1 })
       .limit(limit)
       .populate("createdBy", "name");
@@ -176,6 +185,7 @@ const getRecentProjects = async (req, res) => {
       projects.map(async (project) => {
         // Get all purchases for this project
         const projectPurchases = await Purchase.find({
+          tenantId: req.tenantId,
           project: project._id,
         });
 
@@ -187,6 +197,7 @@ const getRecentProjects = async (req, res) => {
 
         // Get all bank payments for this project (not cancelled)
         const projectBankPayments = await BankPayment.find({
+          tenantId: req.tenantId,
           project: project._id,
           cancel: false,
         });
@@ -199,6 +210,7 @@ const getRecentProjects = async (req, res) => {
 
         // Get all cash payments for this project (not cancelled)
         const projectCashPayments = await CashPayment.find({
+          tenantId: req.tenantId,
           project: project._id,
           cancel: false,
         });
@@ -211,6 +223,7 @@ const getRecentProjects = async (req, res) => {
 
         // Get all sales invoices for this project (revenue)
         const projectInvoices = await SalesInvoice.find({
+          tenantId: req.tenantId,
           project: project._id,
         });
 
@@ -263,7 +276,7 @@ const getRecentProjects = async (req, res) => {
 const getPlotStats = async (req, res) => {
   try {
     // Get all plots, not just active ones, to show sold plots too
-    const plots = await Plot.find();
+    const plots = await Plot.find({ tenantId: req.tenantId });
 
     const stats = {
       total: plots.length,
@@ -310,6 +323,7 @@ const getInventoryStats = async (req, res) => {
   try {
     // Get only materials, equipment, services - exclude Plots
     const items = await Item.find({
+      tenantId: req.tenantId,
       isActive: true,
       itemType: { $ne: "Plot" },
     });
@@ -350,13 +364,19 @@ const getInventoryStats = async (req, res) => {
 const getExpenseBreakdown = async (req, res) => {
   try {
     // Get all purchases (without populate to avoid errors if items don't exist)
-    const purchases = await Purchase.find();
+    const purchases = await Purchase.find({ tenantId: req.tenantId });
 
     // Get all bank payments with account details
-    const bankPayments = await BankPayment.find({ cancel: false });
+    const bankPayments = await BankPayment.find({
+      tenantId: req.tenantId,
+      cancel: false,
+    });
 
     // Get all cash payments
-    const cashPayments = await CashPayment.find({ cancel: false });
+    const cashPayments = await CashPayment.find({
+      tenantId: req.tenantId,
+      cancel: false,
+    });
 
     // Calculate material expenses from purchases
     const materialsTotal = purchases.reduce(
@@ -466,6 +486,7 @@ const getRevenueTrend = async (req, res) => {
       const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
 
       const invoices = await SalesInvoice.find({
+        tenantId: req.tenantId,
         date: { $gte: monthStart, $lte: monthEnd },
       });
 
@@ -512,6 +533,7 @@ const getRevenueVsExpenses = async (req, res) => {
 
       // Revenue
       const invoices = await SalesInvoice.find({
+        tenantId: req.tenantId,
         date: { $gte: monthStart, $lte: monthEnd },
       });
       const revenue = invoices.reduce(
@@ -521,6 +543,7 @@ const getRevenueVsExpenses = async (req, res) => {
 
       // Expenses
       const purchases = await Purchase.find({
+        tenantId: req.tenantId,
         date: { $gte: monthStart, $lte: monthEnd },
       });
       const purchaseExpenses = purchases.reduce(
@@ -529,6 +552,7 @@ const getRevenueVsExpenses = async (req, res) => {
       );
 
       const bankPayments = await BankPayment.find({
+        tenantId: req.tenantId,
         cancel: false,
         date: { $gte: monthStart, $lte: monthEnd },
       });
@@ -538,6 +562,7 @@ const getRevenueVsExpenses = async (req, res) => {
       );
 
       const cashPayments = await CashPayment.find({
+        tenantId: req.tenantId,
         cancel: false,
         date: { $gte: monthStart, $lte: monthEnd },
       });
@@ -574,7 +599,7 @@ const getRevenueVsExpenses = async (req, res) => {
 // @access  Private
 const getProjectStatusDistribution = async (req, res) => {
   try {
-    const projects = await Project.find();
+    const projects = await Project.find({ tenantId: req.tenantId });
 
     const statusCounts = {};
     projects.forEach((project) => {
@@ -621,12 +646,14 @@ const getCashFlow = async (req, res) => {
 
     // Cash In (Revenue this month)
     const invoices = await SalesInvoice.find({
+      tenantId: req.tenantId,
       date: { $gte: firstDayThisMonth },
     });
     const cashIn = invoices.reduce((sum, inv) => sum + (inv.netTotal || 0), 0);
 
     // Cash Out (Expenses this month)
     const purchases = await Purchase.find({
+      tenantId: req.tenantId,
       date: { $gte: firstDayThisMonth },
     });
     const purchaseExpenses = purchases.reduce(
@@ -635,6 +662,7 @@ const getCashFlow = async (req, res) => {
     );
 
     const bankPayments = await BankPayment.find({
+      tenantId: req.tenantId,
       cancel: false,
       date: { $gte: firstDayThisMonth },
     });
@@ -644,6 +672,7 @@ const getCashFlow = async (req, res) => {
     );
 
     const cashPayments = await CashPayment.find({
+      tenantId: req.tenantId,
       cancel: false,
       date: { $gte: firstDayThisMonth },
     });
@@ -679,11 +708,14 @@ const getCashFlow = async (req, res) => {
 // @access  Private
 const getTopProjects = async (req, res) => {
   try {
-    const projects = await Project.find();
+    const projects = await Project.find({ tenantId: req.tenantId });
 
     const projectsWithRevenue = await Promise.all(
       projects.map(async (project) => {
-        const invoices = await SalesInvoice.find({ project: project._id });
+        const invoices = await SalesInvoice.find({
+          tenantId: req.tenantId,
+          project: project._id,
+        });
         const revenue = invoices.reduce(
           (sum, inv) => sum + (inv.netTotal || 0),
           0
@@ -722,17 +754,21 @@ const getTopProjects = async (req, res) => {
 // @access  Private
 const getProjectsOverBudget = async (req, res) => {
   try {
-    const projects = await Project.find();
+    const projects = await Project.find({ tenantId: req.tenantId });
 
     const projectsWithBudget = await Promise.all(
       projects.map(async (project) => {
-        const purchases = await Purchase.find({ project: project._id });
+        const purchases = await Purchase.find({
+          tenantId: req.tenantId,
+          project: project._id,
+        });
         const purchaseSpent = purchases.reduce(
           (sum, p) => sum + (p.netAmount || 0),
           0
         );
 
         const bankPayments = await BankPayment.find({
+          tenantId: req.tenantId,
           project: project._id,
           cancel: false,
         });
@@ -742,6 +778,7 @@ const getProjectsOverBudget = async (req, res) => {
         );
 
         const cashPayments = await CashPayment.find({
+          tenantId: req.tenantId,
           project: project._id,
           cancel: false,
         });
@@ -789,7 +826,10 @@ const getProjectsOverBudget = async (req, res) => {
 // @access  Private
 const getAccountsReceivable = async (req, res) => {
   try {
-    const customers = await Customer.find({ isActive: true });
+    const customers = await Customer.find({
+      tenantId: req.tenantId,
+      isActive: true,
+    });
 
     const totalOutstanding = customers.reduce(
       (sum, c) => sum + (c.balance || 0),
@@ -801,6 +841,7 @@ const getAccountsReceivable = async (req, res) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const invoices = await SalesInvoice.find({
+      tenantId: req.tenantId,
       date: { $lt: thirtyDaysAgo },
     }).populate("customer");
 
@@ -836,7 +877,10 @@ const getAccountsReceivable = async (req, res) => {
 // @access  Private
 const getAccountsPayable = async (req, res) => {
   try {
-    const suppliers = await Supplier.find({ status: "active" });
+    const suppliers = await Supplier.find({
+      tenantId: req.tenantId,
+      status: "active",
+    });
 
     const totalPayable = suppliers.reduce(
       (sum, s) => sum + Math.abs(s.balance || 0),
@@ -848,6 +892,7 @@ const getAccountsPayable = async (req, res) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const purchases = await Purchase.find({
+      tenantId: req.tenantId,
       date: { $lt: thirtyDaysAgo },
     }).populate("supplier");
 
@@ -884,6 +929,7 @@ const getAccountsPayable = async (req, res) => {
 const getLowStockAlerts = async (req, res) => {
   try {
     const items = await Item.find({
+      tenantId: req.tenantId,
       isActive: true,
       itemType: { $ne: "Plot" },
     });
@@ -921,7 +967,10 @@ const getLowStockAlerts = async (req, res) => {
 // @access  Private
 const getTopSuppliers = async (req, res) => {
   try {
-    const suppliers = await Supplier.find({ status: "active" });
+    const suppliers = await Supplier.find({
+      tenantId: req.tenantId,
+      status: "active",
+    });
 
     const topSuppliers = suppliers
       .sort((a, b) => (b.totalPurchases || 0) - (a.totalPurchases || 0))
@@ -952,7 +1001,10 @@ const getTopSuppliers = async (req, res) => {
 // @access  Private
 const getTopCustomers = async (req, res) => {
   try {
-    const customers = await Customer.find({ isActive: true });
+    const customers = await Customer.find({
+      tenantId: req.tenantId,
+      isActive: true,
+    });
 
     const topCustomers = customers
       .sort((a, b) => (b.totalPurchase || 0) - (a.totalPurchase || 0))

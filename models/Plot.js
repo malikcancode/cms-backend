@@ -2,10 +2,13 @@ const mongoose = require("mongoose");
 
 const PlotSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     plotNumber: {
       type: String,
       required: [true, "Plot number is required"],
-      unique: true,
       trim: true,
       uppercase: true,
     },
@@ -276,5 +279,9 @@ PlotSchema.post("save", async function (doc, next) {
     // Don't throw error to prevent plot update failure
   }
 });
+
+// Index for tenant isolation and queries
+PlotSchema.index({ tenantId: 1 });
+PlotSchema.index({ tenantId: 1, plotNumber: 1 });
 
 module.exports = mongoose.model("Plot", PlotSchema);

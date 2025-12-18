@@ -76,6 +76,7 @@ exports.createProject = async (req, res) => {
 
     // Create project data
     const projectData = {
+      tenantId: req.tenantId,
       name,
       client,
       telephone,
@@ -125,7 +126,7 @@ exports.createProject = async (req, res) => {
 // @access  Private
 exports.getAllProjects = async (req, res) => {
   try {
-    const projects = await Project.find()
+    const projects = await Project.find({ tenantId: req.tenantId })
       .populate("createdBy", "name email role")
       .sort({ createdAt: -1 });
 
@@ -149,10 +150,10 @@ exports.getAllProjects = async (req, res) => {
 // @access  Private
 exports.getProjectById = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id).populate(
-      "createdBy",
-      "name email role"
-    );
+    const project = await Project.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    }).populate("createdBy", "name email role");
 
     if (!project) {
       return res.status(404).json({
@@ -216,7 +217,10 @@ exports.updateProject = async (req, res) => {
       projectCompleted !== undefined ? projectCompleted : jobCompleted;
     const mappedJobIncharge = projectIncharge || jobIncharge;
 
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!project) {
       return res.status(404).json({
@@ -303,7 +307,10 @@ exports.updateProject = async (req, res) => {
 // @access  Private
 exports.deleteProject = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!project) {
       return res.status(404).json({
@@ -318,12 +325,15 @@ exports.deleteProject = async (req, res) => {
     const BankPayment = require("../models/BankPayment");
 
     const purchaseCount = await Purchase.countDocuments({
+      tenantId: req.tenantId,
       project: req.params.id,
     });
     const salesCount = await SalesInvoice.countDocuments({
+      tenantId: req.tenantId,
       project: req.params.id,
     });
     const paymentCount = await BankPayment.countDocuments({
+      tenantId: req.tenantId,
       project: req.params.id,
     });
 
@@ -339,7 +349,10 @@ exports.deleteProject = async (req, res) => {
       });
     }
 
-    await Project.findByIdAndDelete(req.params.id);
+    await Project.findOneAndDelete({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     res.status(200).json({
       success: true,
@@ -365,10 +378,10 @@ exports.getProjectLedger = async (req, res) => {
     const CashPayment = require("../models/CashPayment");
     const SalesInvoice = require("../models/SalesInvoice");
 
-    const project = await Project.findById(req.params.id).populate(
-      "createdBy",
-      "name email role"
-    );
+    const project = await Project.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    }).populate("createdBy", "name email role");
 
     if (!project) {
       return res.status(404).json({
@@ -378,13 +391,17 @@ exports.getProjectLedger = async (req, res) => {
     }
 
     // Get all purchases for this project
-    const purchases = await Purchase.find({ project: req.params.id })
+    const purchases = await Purchase.find({
+      tenantId: req.tenantId,
+      project: req.params.id,
+    })
       .populate("item", "name itemCode")
       .populate("employeeReference", "name email")
       .sort({ date: 1 });
 
     // Get all bank payments for this project (if applicable)
     const bankPayments = await BankPayment.find({
+      tenantId: req.tenantId,
       project: req.params.id,
     })
       .populate("employeeRef", "name email")
@@ -393,6 +410,7 @@ exports.getProjectLedger = async (req, res) => {
 
     // Get all cash payments for this project
     const cashPayments = await CashPayment.find({
+      tenantId: req.tenantId,
       project: req.params.id,
     })
       .populate("employeeRef", "name email")
@@ -401,6 +419,7 @@ exports.getProjectLedger = async (req, res) => {
 
     // Get all sales invoices for this project
     const salesInvoices = await SalesInvoice.find({
+      tenantId: req.tenantId,
       project: req.params.id,
     })
       .populate("customer", "name code email phone")

@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 
 const itemSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     // Inventory Category
     categoryCode: {
       type: String,
@@ -34,7 +38,6 @@ const itemSchema = new mongoose.Schema(
     itemCode: {
       type: String,
       required: [true, "Item code is required"],
-      unique: true,
       trim: true,
       uppercase: true,
     },
@@ -104,9 +107,11 @@ const itemSchema = new mongoose.Schema(
 );
 
 // Indexes for better query performance
-itemSchema.index({ categoryCode: 1 });
-itemSchema.index({ subCategoryCode: 1 });
-itemSchema.index({ name: 1 });
+itemSchema.index({ tenantId: 1 });
+itemSchema.index({ tenantId: 1, categoryCode: 1 });
+itemSchema.index({ tenantId: 1, subCategoryCode: 1 });
+itemSchema.index({ tenantId: 1, name: 1 });
+itemSchema.index({ tenantId: 1, itemCode: 1 }, { unique: true });
 
 // Pre-save hook: Initialize currentStock with quantity (existing warehouse stock)
 // When user creates an item, quantity represents what they already have in warehouse

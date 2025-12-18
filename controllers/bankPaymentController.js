@@ -6,7 +6,7 @@ const ChartOfAccount = require("../models/ChartOfAccount");
 // @access  Private
 const getBankPayments = async (req, res) => {
   try {
-    const payments = await BankPayment.find()
+    const payments = await BankPayment.find({ tenantId: req.tenantId })
       .populate("project", "name description")
       .populate("employeeRef", "name email")
       .populate("createdBy", "name email")
@@ -32,7 +32,10 @@ const getBankPayments = async (req, res) => {
 // @access  Private
 const getBankPaymentById = async (req, res) => {
   try {
-    const payment = await BankPayment.findById(req.params.id)
+    const payment = await BankPayment.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    })
       .populate("project", "name description")
       .populate("employeeRef", "name email")
       .populate("createdBy", "name email");
@@ -103,6 +106,7 @@ const createBankPayment = async (req, res) => {
 
     // Create payment
     const payment = await BankPayment.create({
+      tenantId: req.tenantId,
       serialNo: serialNo || undefined, // Will be auto-generated if not provided
       cancel: cancel || false,
       date,
@@ -167,7 +171,10 @@ const updateBankPayment = async (req, res) => {
       paymentLines,
     } = req.body;
 
-    let payment = await BankPayment.findById(req.params.id);
+    let payment = await BankPayment.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!payment) {
       return res.status(404).json({
@@ -225,7 +232,10 @@ const updateBankPayment = async (req, res) => {
 // @access  Private
 const deleteBankPayment = async (req, res) => {
   try {
-    const payment = await BankPayment.findById(req.params.id);
+    const payment = await BankPayment.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!payment) {
       return res.status(404).json({
@@ -291,7 +301,7 @@ const getBankEnum = async (req, res) => {
 // @access  Private
 const getExpenseAccounts = async (req, res) => {
   try {
-    const accounts = await ChartOfAccount.find();
+    const accounts = await ChartOfAccount.find({ tenantId: req.tenantId });
 
     // Flatten all sub accounts with their parent info
     const expenseAccounts = [];
@@ -343,7 +353,7 @@ const getExpenseAccounts = async (req, res) => {
 // @access  Private
 const generateSerialNumber = async (req, res) => {
   try {
-    const count = await BankPayment.countDocuments();
+    const count = await BankPayment.countDocuments({ tenantId: req.tenantId });
     const serialNo = `BP${String(count + 1).padStart(6, "0")}`;
 
     res.status(200).json({

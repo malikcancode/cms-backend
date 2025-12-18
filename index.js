@@ -204,6 +204,7 @@ app.use(ensureDbConnection);
 // Routes
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
+const tenantRoutes = require("./routes/tenantRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const chartOfAccountRoutes = require("./routes/chartOfAccountRoutes");
@@ -223,6 +224,7 @@ const requestApprovalRoutes = require("./routes/requestApprovalRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 
 app.use("/api/auth", authRoutes);
+app.use("/api/tenant", tenantRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/customers", customerRoutes);

@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 
 const requestApprovalSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -71,7 +75,7 @@ const requestApprovalSchema = new mongoose.Schema(
 );
 
 // Index for faster queries
-requestApprovalSchema.index({ userId: 1, status: 1 });
-requestApprovalSchema.index({ status: 1, createdAt: -1 });
+requestApprovalSchema.index({ tenantId: 1, userId: 1, status: 1 });
+requestApprovalSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model("RequestApproval", requestApprovalSchema);

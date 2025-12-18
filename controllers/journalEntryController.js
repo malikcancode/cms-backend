@@ -9,7 +9,7 @@ const getJournalEntries = async (req, res) => {
     const { startDate, endDate, transactionType, status, project } = req.query;
 
     // Build query
-    const query = {};
+    const query = { tenantId: req.tenantId };
     if (startDate || endDate) {
       query.date = {};
       if (startDate) query.date.$gte = new Date(startDate);
@@ -46,7 +46,10 @@ const getJournalEntries = async (req, res) => {
 // @access  Private
 const getJournalEntryById = async (req, res) => {
   try {
-    const entry = await JournalEntry.findById(req.params.id)
+    const entry = await JournalEntry.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    })
       .populate("createdBy", "name email")
       .populate("approvedBy", "name email")
       .populate("project", "name code")
@@ -108,7 +111,10 @@ const createJournalEntry = async (req, res) => {
 // @access  Private
 const updateJournalEntry = async (req, res) => {
   try {
-    const entry = await JournalEntry.findById(req.params.id);
+    const entry = await JournalEntry.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!entry) {
       return res.status(404).json({
@@ -155,7 +161,10 @@ const updateJournalEntry = async (req, res) => {
 // @access  Private
 const deleteJournalEntry = async (req, res) => {
   try {
-    const entry = await JournalEntry.findById(req.params.id);
+    const entry = await JournalEntry.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!entry) {
       return res.status(404).json({
@@ -257,7 +266,10 @@ const getJournalEntriesByAccount = async (req, res) => {
 // @access  Private
 const postJournalEntry = async (req, res) => {
   try {
-    const entry = await JournalEntry.findById(req.params.id);
+    const entry = await JournalEntry.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!entry) {
       return res.status(404).json({

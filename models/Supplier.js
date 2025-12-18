@@ -2,10 +2,13 @@ const mongoose = require("mongoose");
 
 const supplierSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     code: {
       type: String,
       required: [true, "Supplier code is required"],
-      unique: true,
       trim: true,
     },
     name: {
@@ -77,8 +80,8 @@ const supplierSchema = new mongoose.Schema(
 );
 
 // Index for faster queries
-supplierSchema.index({ name: 1 });
-supplierSchema.index({ category: 1 });
-supplierSchema.index({ code: 1 });
+supplierSchema.index({ tenantId: 1, name: 1 });
+supplierSchema.index({ tenantId: 1, category: 1 });
+supplierSchema.index({ tenantId: 1, code: 1 });
 
 module.exports = mongoose.model("Supplier", supplierSchema);

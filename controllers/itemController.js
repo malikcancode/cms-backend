@@ -5,7 +5,9 @@ const Item = require("../models/Item");
 // @access  Private
 exports.getAllItems = async (req, res) => {
   try {
-    const items = await Item.find().sort({ createdAt: -1 });
+    const items = await Item.find({ tenantId: req.tenantId }).sort({
+      createdAt: -1,
+    });
 
     res.status(200).json({
       success: true,
@@ -27,7 +29,10 @@ exports.getAllItems = async (req, res) => {
 // @access  Private
 exports.getItemById = async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id);
+    const item = await Item.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!item) {
       return res.status(404).json({
@@ -84,6 +89,7 @@ exports.createItem = async (req, res) => {
 
     // Check if item code already exists
     const existingItem = await Item.findOne({
+      tenantId: req.tenantId,
       itemCode: itemCode.toUpperCase(),
     });
     if (existingItem) {
@@ -95,6 +101,7 @@ exports.createItem = async (req, res) => {
 
     // Create item data
     const itemData = {
+      tenantId: req.tenantId,
       categoryCode: categoryCode.toUpperCase(),
       categoryName,
       subCategoryCode: subCategoryCode ? subCategoryCode.toUpperCase() : "",
@@ -158,7 +165,10 @@ exports.updateItem = async (req, res) => {
       isActive,
     } = req.body;
 
-    const item = await Item.findById(req.params.id);
+    const item = await Item.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!item) {
       return res.status(404).json({
@@ -180,6 +190,7 @@ exports.updateItem = async (req, res) => {
     if (itemCode) {
       // Check if item code is already taken by another item
       const existingItem = await Item.findOne({
+        tenantId: req.tenantId,
         itemCode: itemCode.toUpperCase(),
       });
       if (existingItem && existingItem._id.toString() !== req.params.id) {
@@ -226,7 +237,10 @@ exports.updateItem = async (req, res) => {
 // @access  Private
 exports.deleteItem = async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id);
+    const item = await Item.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!item) {
       return res.status(404).json({
@@ -240,9 +254,11 @@ exports.deleteItem = async (req, res) => {
     const SalesInvoice = require("../models/SalesInvoice");
 
     const purchaseCount = await Purchase.countDocuments({
+      tenantId: req.tenantId,
       item: req.params.id,
     });
     const salesCount = await SalesInvoice.countDocuments({
+      tenantId: req.tenantId,
       "items.itemCode": item.itemCode,
     });
 
@@ -257,7 +273,7 @@ exports.deleteItem = async (req, res) => {
       });
     }
 
-    await Item.findByIdAndDelete(req.params.id);
+    await Item.findOneAndDelete({ _id: req.params.id, tenantId: req.tenantId });
 
     res.status(200).json({
       success: true,
@@ -279,6 +295,7 @@ exports.deleteItem = async (req, res) => {
 exports.getItemByCode = async (req, res) => {
   try {
     const item = await Item.findOne({
+      tenantId: req.tenantId,
       itemCode: req.params.code.toUpperCase(),
     });
 
@@ -309,6 +326,7 @@ exports.getItemByCode = async (req, res) => {
 exports.getItemsByCategory = async (req, res) => {
   try {
     const items = await Item.find({
+      tenantId: req.tenantId,
       categoryCode: req.params.categoryCode.toUpperCase(),
     }).sort({ name: 1 });
 
@@ -333,6 +351,7 @@ exports.getItemsByCategory = async (req, res) => {
 exports.getItemsBySubCategory = async (req, res) => {
   try {
     const items = await Item.find({
+      tenantId: req.tenantId,
       subCategoryCode: req.params.subCategoryCode.toUpperCase(),
     }).sort({ name: 1 });
 
@@ -359,6 +378,7 @@ exports.syncItemStock = async (req, res) => {
     // Find all items where currentStock is 0 but quantity > 0
     const result = await Item.updateMany(
       {
+        tenantId: req.tenantId,
         currentStock: 0,
         quantity: { $gt: 0 },
       },

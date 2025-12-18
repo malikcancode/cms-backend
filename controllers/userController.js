@@ -5,7 +5,9 @@ const User = require("../models/User");
 // @access  Private/Admin
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select("-password").sort({ createdAt: -1 });
+    const users = await User.find({ tenantId: req.tenantId })
+      .select("-password")
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
@@ -27,7 +29,10 @@ exports.getAllUsers = async (req, res) => {
 // @access  Private/Admin
 exports.getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select("-password");
+    const user = await User.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    }).select("-password");
 
     if (!user) {
       return res.status(404).json({
@@ -138,7 +143,10 @@ exports.updateUser = async (req, res) => {
     const { name, email, password, role, customPermissions, isActive } =
       req.body;
 
-    const user = await User.findById(req.params.id);
+    const user = await User.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!user) {
       return res.status(404).json({
@@ -209,7 +217,10 @@ exports.updateUser = async (req, res) => {
 // @access  Private/Admin
 exports.deleteUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!user) {
       return res.status(404).json({

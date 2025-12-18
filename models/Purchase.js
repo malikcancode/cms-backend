@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 
 const purchaseSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     // Top Fields
     serialNo: {
       type: String,
@@ -241,5 +245,10 @@ purchaseSchema.post("save", async function (doc) {
     }
   }
 });
+
+// Indexes for tenant isolation and queries
+purchaseSchema.index({ tenantId: 1 });
+purchaseSchema.index({ tenantId: 1, serialNo: 1 });
+purchaseSchema.index({ tenantId: 1, supplierId: 1 });
 
 module.exports = mongoose.model("Purchase", purchaseSchema);

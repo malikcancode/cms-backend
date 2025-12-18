@@ -71,6 +71,9 @@ exports.protect = async (req, res, next) => {
         });
       }
 
+      // Extract tenantId from user and attach to request
+      req.tenantId = req.user.tenantId;
+
       // Store token for potential blacklisting
       req.token = token;
 

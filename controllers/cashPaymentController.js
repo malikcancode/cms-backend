@@ -10,7 +10,7 @@ const AccountingService = require("../services/accountingService");
 // @access  Private
 exports.getAllCashPayments = async (req, res) => {
   try {
-    const cashPayments = await CashPayment.find()
+    const cashPayments = await CashPayment.find({ tenantId: req.tenantId })
       .populate("project", "name code")
       .populate("employeeRef", "name email")
       .populate("createdBy", "name email")
@@ -36,7 +36,10 @@ exports.getAllCashPayments = async (req, res) => {
 // @access  Private
 exports.getCashPaymentById = async (req, res) => {
   try {
-    const cashPayment = await CashPayment.findById(req.params.id)
+    const cashPayment = await CashPayment.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    })
       .populate("project", "name code client")
       .populate("employeeRef", "name email")
       .populate("createdBy", "name email");
@@ -86,7 +89,10 @@ exports.createCashPayment = async (req, res) => {
 
     // Verify project if provided
     if (project) {
-      const projectExists = await Project.findById(project);
+      const projectExists = await Project.findOne({
+        _id: project,
+        tenantId: req.tenantId,
+      });
       if (!projectExists) {
         return res.status(404).json({
           success: false,
@@ -97,7 +103,10 @@ exports.createCashPayment = async (req, res) => {
 
     // Verify employee reference if provided
     if (employeeRef) {
-      const userExists = await User.findById(employeeRef);
+      const userExists = await User.findOne({
+        _id: employeeRef,
+        tenantId: req.tenantId,
+      });
       if (!userExists) {
         return res.status(404).json({
           success: false,
@@ -125,6 +134,7 @@ exports.createCashPayment = async (req, res) => {
 
     // Create cash payment data
     const cashPaymentData = {
+      tenantId: req.tenantId,
       date: new Date(date),
       project: project || null,
       jobDescription: jobDescription || "",
@@ -169,7 +179,10 @@ exports.createCashPayment = async (req, res) => {
 // @access  Private
 exports.updateCashPayment = async (req, res) => {
   try {
-    const cashPayment = await CashPayment.findById(req.params.id);
+    const cashPayment = await CashPayment.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!cashPayment) {
       return res.status(404).json({
@@ -274,7 +287,10 @@ exports.updateCashPayment = async (req, res) => {
 // @access  Private
 exports.deleteCashPayment = async (req, res) => {
   try {
-    const cashPayment = await CashPayment.findById(req.params.id);
+    const cashPayment = await CashPayment.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!cashPayment) {
       return res.status(404).json({
@@ -301,7 +317,10 @@ exports.deleteCashPayment = async (req, res) => {
       console.error("Accounting reversal (cash payment delete) error:", accErr);
     }
 
-    await CashPayment.findByIdAndDelete(req.params.id);
+    await CashPayment.findOneAndDelete({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     res.status(200).json({
       success: true,
@@ -390,7 +409,7 @@ exports.getCashPaymentsByDateRange = async (req, res) => {
 // @access  Private
 exports.getExpenseAccounts = async (req, res) => {
   try {
-    const accounts = await ChartOfAccount.find();
+    const accounts = await ChartOfAccount.find({ tenantId: req.tenantId });
 
     // Flatten all sub accounts with their parent info
     const expenseAccounts = [];

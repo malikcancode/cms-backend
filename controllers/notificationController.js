@@ -8,14 +8,21 @@ exports.getMyNotifications = async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const notifications = await Notification.find({ recipient: req.user.id })
+    const notifications = await Notification.find({
+      tenantId: req.tenantId,
+      recipient: req.user.id,
+    })
       .populate("sender", "name email role")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    const total = await Notification.countDocuments({ recipient: req.user.id });
+    const total = await Notification.countDocuments({
+      tenantId: req.tenantId,
+      recipient: req.user.id,
+    });
     const unreadCount = await Notification.countDocuments({
+      tenantId: req.tenantId,
       recipient: req.user.id,
       isRead: false,
     });
@@ -43,6 +50,7 @@ exports.getMyNotifications = async (req, res) => {
 exports.getUnreadCount = async (req, res) => {
   try {
     const count = await Notification.countDocuments({
+      tenantId: req.tenantId,
       recipient: req.user.id,
       isRead: false,
     });
@@ -64,7 +72,7 @@ exports.getUnreadCount = async (req, res) => {
 exports.markAsRead = async (req, res) => {
   try {
     const notification = await Notification.findOneAndUpdate(
-      { _id: req.params.id, recipient: req.user.id },
+      { _id: req.params.id, tenantId: req.tenantId, recipient: req.user.id },
       { isRead: true, readAt: new Date() },
       { new: true }
     ).populate("sender", "name email role");
@@ -93,7 +101,7 @@ exports.markAsRead = async (req, res) => {
 exports.markAllAsRead = async (req, res) => {
   try {
     await Notification.updateMany(
-      { recipient: req.user.id, isRead: false },
+      { tenantId: req.tenantId, recipient: req.user.id, isRead: false },
       { isRead: true, readAt: new Date() }
     );
 
@@ -115,6 +123,7 @@ exports.deleteNotification = async (req, res) => {
   try {
     const notification = await Notification.findOneAndDelete({
       _id: req.params.id,
+      tenantId: req.tenantId,
       recipient: req.user.id,
     });
 
@@ -142,6 +151,7 @@ exports.deleteNotification = async (req, res) => {
 exports.deleteAllRead = async (req, res) => {
   try {
     await Notification.deleteMany({
+      tenantId: req.tenantId,
       recipient: req.user.id,
       isRead: true,
     });

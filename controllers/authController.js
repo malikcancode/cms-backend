@@ -22,7 +22,7 @@ const generateToken = (userId) => {
 // @access  Public (but should be restricted in production)
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, tenantId } = req.body;
 
     // Validation
     if (!name || !email || !password) {
@@ -32,7 +32,7 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Check if user already exists
+    // Check if user already exists globally (no tenant scope for registration)
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -41,12 +41,30 @@ exports.register = async (req, res) => {
       });
     }
 
+    // Get or use provided tenantId
+    let userTenantId = tenantId;
+
+    // If no tenantId provided, try to get the first tenant (for fresh start)
+    if (!userTenantId) {
+      const Tenant = require("../models/Tenant");
+      const tenant = await Tenant.findOne();
+      if (!tenant) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "No tenant found. Please create a portal first using /api/tenants/register",
+        });
+      }
+      userTenantId = tenant.tenantId;
+    }
+
     // Create user
     const user = await User.create({
       name,
       email,
       password,
       role: role || "user",
+      tenantId: userTenantId,
     });
 
     res.status(201).json({
@@ -57,6 +75,7 @@ exports.register = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        tenantId: user.tenantId,
       },
     });
   } catch (error) {
@@ -89,7 +108,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Find user and include password
+    // Find user by email only - system will automatically find their tenant
     const user = await User.findOne({ email }).select("+password");
     if (!user) {
       return res.status(401).json({
@@ -118,6 +137,12 @@ exports.login = async (req, res) => {
     // Generate token
     const token = generateToken(user._id);
 
+    // Get tenant info
+    const Tenant = require("../models/Tenant");
+    const tenant = await Tenant.findOne({ tenantId: user.tenantId }).select(
+      "-password"
+    );
+
     console.log("Login successful for:", email);
     res.status(200).json({
       success: true,
@@ -128,8 +153,15 @@ exports.login = async (req, res) => {
           name: user.name,
           email: user.email,
           role: user.role,
+          tenantId: user.tenantId,
           customPermissions: user.customPermissions,
         },
+        tenant: tenant
+          ? {
+              tenantId: tenant.tenantId,
+              portalName: tenant.portalName,
+            }
+          : null,
         token,
       },
     });

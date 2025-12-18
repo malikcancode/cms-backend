@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 
 const projectSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     name: {
       type: String,
       required: [true, "Project name is required"],
@@ -90,5 +94,9 @@ const projectSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Index for tenant isolation and queries
+projectSchema.index({ tenantId: 1 });
+projectSchema.index({ tenantId: 1, status: 1 });
 
 module.exports = mongoose.model("Project", projectSchema);

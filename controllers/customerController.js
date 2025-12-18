@@ -5,7 +5,9 @@ const Customer = require("../models/Customer");
 // @access  Private
 exports.getAllCustomers = async (req, res) => {
   try {
-    const customers = await Customer.find().sort({ createdAt: -1 });
+    const customers = await Customer.find({ tenantId: req.tenantId }).sort({
+      createdAt: -1,
+    });
 
     res.status(200).json({
       success: true,
@@ -27,7 +29,10 @@ exports.getAllCustomers = async (req, res) => {
 // @access  Private
 exports.getCustomerById = async (req, res) => {
   try {
-    const customer = await Customer.findById(req.params.id);
+    const customer = await Customer.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!customer) {
       return res.status(404).json({
@@ -69,6 +74,7 @@ exports.createCustomer = async (req, res) => {
 
     // Check if customer code already exists
     const existingCustomer = await Customer.findOne({
+      tenantId: req.tenantId,
       code: code.toUpperCase(),
     });
     if (existingCustomer) {
@@ -79,7 +85,10 @@ exports.createCustomer = async (req, res) => {
     }
 
     // Check if email already exists
-    const existingEmail = await Customer.findOne({ email });
+    const existingEmail = await Customer.findOne({
+      tenantId: req.tenantId,
+      email,
+    });
     if (existingEmail) {
       return res.status(400).json({
         success: false,
@@ -89,6 +98,7 @@ exports.createCustomer = async (req, res) => {
 
     // Create customer data
     const customerData = {
+      tenantId: req.tenantId,
       code: code.toUpperCase(),
       name,
       email,
@@ -132,7 +142,10 @@ exports.updateCustomer = async (req, res) => {
       isActive,
     } = req.body;
 
-    const customer = await Customer.findById(req.params.id);
+    const customer = await Customer.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!customer) {
       return res.status(404).json({
@@ -145,6 +158,7 @@ exports.updateCustomer = async (req, res) => {
     if (code) {
       // Check if code is already taken by another customer
       const existingCustomer = await Customer.findOne({
+        tenantId: req.tenantId,
         code: code.toUpperCase(),
       });
       if (
@@ -163,7 +177,10 @@ exports.updateCustomer = async (req, res) => {
 
     if (email) {
       // Check if email is already taken by another customer
-      const existingEmail = await Customer.findOne({ email });
+      const existingEmail = await Customer.findOne({
+        tenantId: req.tenantId,
+        email,
+      });
       if (existingEmail && existingEmail._id.toString() !== req.params.id) {
         return res.status(400).json({
           success: false,
@@ -202,7 +219,10 @@ exports.updateCustomer = async (req, res) => {
 // @access  Private
 exports.deleteCustomer = async (req, res) => {
   try {
-    const customer = await Customer.findById(req.params.id);
+    const customer = await Customer.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!customer) {
       return res.status(404).json({
@@ -215,6 +235,7 @@ exports.deleteCustomer = async (req, res) => {
     const SalesInvoice = require("../models/SalesInvoice");
 
     const salesCount = await SalesInvoice.countDocuments({
+      tenantId: req.tenantId,
       customer: req.params.id,
     });
 
@@ -228,7 +249,10 @@ exports.deleteCustomer = async (req, res) => {
       });
     }
 
-    await Customer.findByIdAndDelete(req.params.id);
+    await Customer.findOneAndDelete({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     res.status(200).json({
       success: true,
@@ -250,6 +274,7 @@ exports.deleteCustomer = async (req, res) => {
 exports.getCustomerByCode = async (req, res) => {
   try {
     const customer = await Customer.findOne({
+      tenantId: req.tenantId,
       code: req.params.code.toUpperCase(),
     });
 

@@ -24,10 +24,13 @@ const PaymentLineSchema = new mongoose.Schema({
 
 const BankPaymentSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     serialNo: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     cancel: {
@@ -131,7 +134,10 @@ BankPaymentSchema.post("save", async function (doc) {
     }
   }
 });
-
+// Indexes for tenant isolation and queries
+BankPaymentSchema.index({ tenantId: 1 });
+BankPaymentSchema.index({ tenantId: 1, serialNo: 1 });
+BankPaymentSchema.index({ tenantId: 1, date: -1 });
 const BankPayment = mongoose.model("BankPayment", BankPaymentSchema);
 
 module.exports = BankPayment;

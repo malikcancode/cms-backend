@@ -2,11 +2,14 @@ const mongoose = require("mongoose");
 
 const notificationSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     recipient: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
     sender: {
       type: mongoose.Schema.Types.ObjectId,
@@ -68,7 +71,6 @@ const notificationSchema = new mongoose.Schema(
     isRead: {
       type: Boolean,
       default: false,
-      index: true,
     },
     readAt: {
       type: Date,
@@ -81,7 +83,15 @@ const notificationSchema = new mongoose.Schema(
 );
 
 // Index for efficient queries
-notificationSchema.index({ recipient: 1, isRead: 1, createdAt: -1 });
-notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 2592000 }); // Auto-delete after 30 days
+notificationSchema.index({
+  tenantId: 1,
+  recipient: 1,
+  isRead: 1,
+  createdAt: -1,
+});
+notificationSchema.index(
+  { tenantId: 1, createdAt: 1 },
+  { expireAfterSeconds: 2592000 }
+); // Auto-delete after 30 days
 
 module.exports = mongoose.model("Notification", notificationSchema);

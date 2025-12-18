@@ -10,7 +10,7 @@ const Plot = require("../models/Plot");
 // @access  Private
 exports.getAllSalesInvoices = async (req, res) => {
   try {
-    const salesInvoices = await SalesInvoice.find()
+    const salesInvoices = await SalesInvoice.find({ tenantId: req.tenantId })
       .populate("customer", "name code email phone address")
       .populate("employeeReference", "name email")
       .populate("project", "name code")
@@ -36,7 +36,10 @@ exports.getAllSalesInvoices = async (req, res) => {
 // @access  Private
 exports.getSalesInvoiceById = async (req, res) => {
   try {
-    const salesInvoice = await SalesInvoice.findById(req.params.id)
+    const salesInvoice = await SalesInvoice.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    })
       .populate("customer", "name code email phone address")
       .populate("employeeReference", "name email")
       .populate("project", "name code estimatedCost");
@@ -105,7 +108,10 @@ exports.createSalesInvoice = async (req, res) => {
     }
 
     // Verify customer exists
-    const customerExists = await Customer.findById(customer);
+    const customerExists = await Customer.findOne({
+      _id: customer,
+      tenantId: req.tenantId,
+    });
     if (!customerExists) {
       return res.status(404).json({
         success: false,
@@ -115,7 +121,10 @@ exports.createSalesInvoice = async (req, res) => {
 
     // Verify project if provided
     if (project) {
-      const projectExists = await Project.findById(project);
+      const projectExists = await Project.findOne({
+        _id: project,
+        tenantId: req.tenantId,
+      });
       if (!projectExists) {
         return res.status(404).json({
           success: false,
@@ -126,7 +135,10 @@ exports.createSalesInvoice = async (req, res) => {
 
     // Verify employee reference if provided
     if (employeeReference) {
-      const userExists = await User.findById(employeeReference);
+      const userExists = await User.findOne({
+        _id: employeeReference,
+        tenantId: req.tenantId,
+      });
       if (!userExists) {
         return res.status(404).json({
           success: false,
@@ -137,6 +149,7 @@ exports.createSalesInvoice = async (req, res) => {
 
     // Create sales invoice data
     const salesInvoiceData = {
+      tenantId: req.tenantId,
       date: date || new Date(),
       purchaseOrderNo: purchaseOrderNo || "",
       deliveryChallanNo: deliveryChallanNo || "",
@@ -342,7 +355,10 @@ exports.createSalesInvoice = async (req, res) => {
 // @access  Private
 exports.updateSalesInvoice = async (req, res) => {
   try {
-    const salesInvoice = await SalesInvoice.findById(req.params.id);
+    const salesInvoice = await SalesInvoice.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!salesInvoice) {
       return res.status(404).json({
@@ -393,7 +409,10 @@ exports.updateSalesInvoice = async (req, res) => {
 
     // Verify customer if being updated
     if (customer && customer !== oldCustomer.toString()) {
-      const customerExists = await Customer.findById(customer);
+      const customerExists = await Customer.findOne({
+        _id: customer,
+        tenantId: req.tenantId,
+      });
       if (!customerExists) {
         return res.status(404).json({
           success: false,
@@ -707,7 +726,10 @@ exports.updateSalesInvoice = async (req, res) => {
 // @access  Private
 exports.deleteSalesInvoice = async (req, res) => {
   try {
-    const salesInvoice = await SalesInvoice.findById(req.params.id);
+    const salesInvoice = await SalesInvoice.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!salesInvoice) {
       return res.status(404).json({

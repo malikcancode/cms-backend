@@ -5,7 +5,9 @@ const Supplier = require("../models/Supplier");
 // @access  Private
 exports.getAllSuppliers = async (req, res) => {
   try {
-    const suppliers = await Supplier.find().sort({ createdAt: -1 });
+    const suppliers = await Supplier.find({ tenantId: req.tenantId }).sort({
+      createdAt: -1,
+    });
     res.status(200).json({
       success: true,
       count: suppliers.length,
@@ -25,7 +27,10 @@ exports.getAllSuppliers = async (req, res) => {
 // @access  Private
 exports.getSupplier = async (req, res) => {
   try {
-    const supplier = await Supplier.findById(req.params.id);
+    const supplier = await Supplier.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!supplier) {
       return res.status(404).json({
@@ -66,7 +71,10 @@ exports.createSupplier = async (req, res) => {
     } = req.body;
 
     // Check if supplier code already exists
-    const existingSupplier = await Supplier.findOne({ code });
+    const existingSupplier = await Supplier.findOne({
+      tenantId: req.tenantId,
+      code,
+    });
     if (existingSupplier) {
       return res.status(400).json({
         success: false,
@@ -75,6 +83,7 @@ exports.createSupplier = async (req, res) => {
     }
 
     const supplier = await Supplier.create({
+      tenantId: req.tenantId,
       code,
       name,
       email,
@@ -126,7 +135,10 @@ exports.updateSupplier = async (req, res) => {
       status,
     } = req.body;
 
-    let supplier = await Supplier.findById(req.params.id);
+    let supplier = await Supplier.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!supplier) {
       return res.status(404).json({
@@ -137,7 +149,10 @@ exports.updateSupplier = async (req, res) => {
 
     // Check if new code conflicts with existing supplier
     if (code && code !== supplier.code) {
-      const existingSupplier = await Supplier.findOne({ code });
+      const existingSupplier = await Supplier.findOne({
+        tenantId: req.tenantId,
+        code,
+      });
       if (existingSupplier) {
         return res.status(400).json({
           success: false,
@@ -146,8 +161,8 @@ exports.updateSupplier = async (req, res) => {
       }
     }
 
-    supplier = await Supplier.findByIdAndUpdate(
-      req.params.id,
+    supplier = await Supplier.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.tenantId },
       {
         code,
         name,
@@ -185,7 +200,10 @@ exports.updateSupplier = async (req, res) => {
 // @access  Private
 exports.deleteSupplier = async (req, res) => {
   try {
-    const supplier = await Supplier.findById(req.params.id);
+    const supplier = await Supplier.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!supplier) {
       return res.status(404).json({
@@ -198,6 +216,7 @@ exports.deleteSupplier = async (req, res) => {
     const Purchase = require("../models/Purchase");
 
     const purchaseCount = await Purchase.countDocuments({
+      tenantId: req.tenantId,
       vendorName: supplier.name,
     });
 
@@ -211,7 +230,10 @@ exports.deleteSupplier = async (req, res) => {
       });
     }
 
-    await Supplier.findByIdAndDelete(req.params.id);
+    await Supplier.findOneAndDelete({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     res.status(200).json({
       success: true,
@@ -233,6 +255,7 @@ exports.deleteSupplier = async (req, res) => {
 exports.getSuppliersByCategory = async (req, res) => {
   try {
     const suppliers = await Supplier.find({
+      tenantId: req.tenantId,
       category: req.params.category,
       status: "active",
     }).sort({ name: 1 });

@@ -41,10 +41,13 @@ const JournalEntryLineSchema = new mongoose.Schema({
 // Main Journal Entry Schema
 const JournalEntrySchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     entryNumber: {
       type: String,
       required: false, // Auto-generated in pre-save hook
-      unique: true,
       trim: true,
     },
     date: {
@@ -175,16 +178,17 @@ const JournalEntrySchema = new mongoose.Schema(
 );
 
 // Indexes for performance
-JournalEntrySchema.index({ date: -1 });
+JournalEntrySchema.index({ tenantId: 1, date: -1 });
 // entryNumber already has unique index from schema definition
-JournalEntrySchema.index({ transactionType: 1, date: -1 });
-JournalEntrySchema.index({ project: 1, date: -1 });
+JournalEntrySchema.index({ tenantId: 1, transactionType: 1, date: -1 });
+JournalEntrySchema.index({ tenantId: 1, project: 1, date: -1 });
 JournalEntrySchema.index({
+  tenantId: 1,
   "sourceTransaction.model": 1,
   "sourceTransaction.id": 1,
 });
-JournalEntrySchema.index({ status: 1 });
-JournalEntrySchema.index({ "lines.accountCode": 1 });
+JournalEntrySchema.index({ tenantId: 1, status: 1 });
+JournalEntrySchema.index({ tenantId: 1, "lines.accountCode": 1 });
 
 // Pre-save validation: ensure debits equal credits
 JournalEntrySchema.pre("save", function (next) {
@@ -299,6 +303,10 @@ JournalEntrySchema.statics.getByAccount = function (
 
   return this.find(query).sort({ date: 1 }).populate("createdBy", "name email");
 };
+
+// Indexes for tenant isolation and queries
+JournalEntrySchema.index({ tenantId: 1 });
+JournalEntrySchema.index({ tenantId: 1, entryNumber: 1 });
 
 const JournalEntry = mongoose.model("JournalEntry", JournalEntrySchema);
 

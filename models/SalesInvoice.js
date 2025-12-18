@@ -64,10 +64,13 @@ const salesInvoiceItemSchema = new mongoose.Schema({
 
 const salesInvoiceSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     // Top Fields
     serialNo: {
       type: String,
-      unique: true,
       trim: true,
       uppercase: true,
     },
@@ -310,5 +313,10 @@ salesInvoiceSchema.post("save", async function (doc) {
     }
   }
 });
+
+// Indexes for tenant isolation and queries
+salesInvoiceSchema.index({ tenantId: 1 });
+salesInvoiceSchema.index({ tenantId: 1, serialNo: 1 });
+salesInvoiceSchema.index({ tenantId: 1, customerId: 1 });
 
 module.exports = mongoose.model("SalesInvoice", salesInvoiceSchema);

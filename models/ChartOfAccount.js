@@ -28,11 +28,14 @@ const ListAccountSchema = new mongoose.Schema({
 
 const ChartOfAccountSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: String,
+      required: [true, "Tenant ID is required"],
+    },
     code: {
       type: String,
       trim: true,
       sparse: true,
-      index: true,
     },
     name: {
       type: String,
@@ -83,8 +86,9 @@ const ChartOfAccountSchema = new mongoose.Schema(
 );
 
 // Index for faster queries
-ChartOfAccountSchema.index({ mainAccountType: 1 });
-ChartOfAccountSchema.index({ mainTypeCode: 1 });
+ChartOfAccountSchema.index({ tenantId: 1, mainAccountType: 1 });
+ChartOfAccountSchema.index({ tenantId: 1, mainTypeCode: 1 });
+ChartOfAccountSchema.index({ tenantId: 1, code: 1 });
 
 const ChartOfAccount = mongoose.model("ChartOfAccount", ChartOfAccountSchema);
 

@@ -10,7 +10,7 @@ exports.getAllPlots = async (req, res) => {
     const query = req.sanitizedQuery || req.query;
     const { project, status } = query;
 
-    const filter = { isActive: true };
+    const filter = { tenantId: req.tenantId, isActive: true };
     if (project) filter.project = project;
     if (status) filter.status = status;
 
@@ -40,7 +40,10 @@ exports.getAllPlots = async (req, res) => {
 // @access  Private
 exports.getPlotById = async (req, res) => {
   try {
-    const plot = await Plot.findById(req.params.id)
+    const plot = await Plot.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    })
       .populate("project", "name code client location")
       .populate("customer", "name email phone address")
       .populate("createdBy", "name email");
@@ -95,7 +98,10 @@ exports.createPlot = async (req, res) => {
     }
 
     // Verify project exists
-    const projectExists = await Project.findById(project);
+    const projectExists = await Project.findOne({
+      _id: project,
+      tenantId: req.tenantId,
+    });
     if (!projectExists) {
       return res.status(404).json({
         success: false,
@@ -104,7 +110,10 @@ exports.createPlot = async (req, res) => {
     }
 
     // Check if plot number already exists
-    const existingPlot = await Plot.findOne({ plotNumber });
+    const existingPlot = await Plot.findOne({
+      tenantId: req.tenantId,
+      plotNumber,
+    });
     if (existingPlot) {
       return res.status(400).json({
         success: false,
@@ -114,6 +123,7 @@ exports.createPlot = async (req, res) => {
 
     // Create plot data
     const plotData = {
+      tenantId: req.tenantId,
       plotNumber,
       project,
       block,
@@ -162,7 +172,10 @@ exports.createPlot = async (req, res) => {
 // @access  Private
 exports.updatePlot = async (req, res) => {
   try {
-    const plot = await Plot.findById(req.params.id);
+    const plot = await Plot.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!plot) {
       return res.status(404).json({
@@ -255,7 +268,10 @@ exports.updatePlot = async (req, res) => {
 // @access  Private
 exports.deletePlot = async (req, res) => {
   try {
-    const plot = await Plot.findById(req.params.id);
+    const plot = await Plot.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!plot) {
       return res.status(404).json({
@@ -288,6 +304,7 @@ exports.deletePlot = async (req, res) => {
 exports.getPlotsByProject = async (req, res) => {
   try {
     const plots = await Plot.find({
+      tenantId: req.tenantId,
       project: req.params.projectId,
       isActive: true,
     })
@@ -316,7 +333,7 @@ exports.getPlotsByProject = async (req, res) => {
 exports.getPlotSummary = async (req, res) => {
   try {
     const { project } = req.query;
-    const filter = { isActive: true };
+    const filter = { tenantId: req.tenantId, isActive: true };
     if (project) filter.project = project;
 
     const plots = await Plot.find(filter);

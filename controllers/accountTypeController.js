@@ -5,7 +5,10 @@ const AccountType = require("../models/AccountType");
 // @access  Private
 const getAllAccountTypes = async (req, res) => {
   try {
-    const accountTypes = await AccountType.find({ isActive: true })
+    const accountTypes = await AccountType.find({
+      tenantId: req.tenantId,
+      isActive: true,
+    })
       .sort({ name: 1 })
       .populate("createdBy", "name email");
 
@@ -29,10 +32,10 @@ const getAllAccountTypes = async (req, res) => {
 // @access  Private
 const getAccountTypeById = async (req, res) => {
   try {
-    const accountType = await AccountType.findById(req.params.id).populate(
-      "createdBy",
-      "name email"
-    );
+    const accountType = await AccountType.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    }).populate("createdBy", "name email");
 
     if (!accountType) {
       return res.status(404).json({
@@ -72,6 +75,7 @@ const createAccountType = async (req, res) => {
 
     // Check if account type already exists
     const existingAccountType = await AccountType.findOne({
+      tenantId: req.tenantId,
       $or: [{ name }, { code: code.toUpperCase() }],
     });
 
@@ -84,6 +88,7 @@ const createAccountType = async (req, res) => {
 
     // Create account type
     const accountType = await AccountType.create({
+      tenantId: req.tenantId,
       name,
       code: code.toUpperCase(),
       financialComponent,
@@ -122,7 +127,10 @@ const createAccountType = async (req, res) => {
 // @access  Private
 const updateAccountType = async (req, res) => {
   try {
-    const accountType = await AccountType.findById(req.params.id);
+    const accountType = await AccountType.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!accountType) {
       return res.status(404).json({
@@ -135,7 +143,10 @@ const updateAccountType = async (req, res) => {
 
     // Check for duplicates if name or code is being changed
     if (name && name !== accountType.name) {
-      const existing = await AccountType.findOne({ name });
+      const existing = await AccountType.findOne({
+        tenantId: req.tenantId,
+        name,
+      });
       if (existing) {
         return res.status(400).json({
           success: false,
@@ -147,6 +158,7 @@ const updateAccountType = async (req, res) => {
 
     if (code && code.toUpperCase() !== accountType.code) {
       const existing = await AccountType.findOne({
+        tenantId: req.tenantId,
         code: code.toUpperCase(),
       });
       if (existing) {
@@ -186,7 +198,10 @@ const updateAccountType = async (req, res) => {
 // @access  Private
 const deleteAccountType = async (req, res) => {
   try {
-    const accountType = await AccountType.findById(req.params.id);
+    const accountType = await AccountType.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
 
     if (!accountType) {
       return res.status(404).json({
